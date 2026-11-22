@@ -1126,7 +1126,7 @@ private fun MineStudyApp() {
                                                     model = currentBatchInfo.thumbnail,
                                                     contentDescription = currentBatchInfo.name,
                                                     contentScale = ContentScale.Crop,
-                                                    modifier = Modifier.width(88.dp).aspectRatio(1.8f).clip(RoundedCornerShape(10.dp))
+                                                    modifier = Modifier.width(88.dp).aspectRatio(1.7f).clip(RoundedCornerShape(10.dp))
                                                 )
                                             } else {
                                                 Box(
@@ -1257,7 +1257,7 @@ private fun MineStudyApp() {
                                 ) {
                                     Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                                         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                                            BatchThumbnail(info.thumbnail, Modifier.width(112.dp).aspectRatio(1.8f))
+                                            BatchThumbnail(info.thumbnail, Modifier.width(112.dp).aspectRatio(1.7f))
                                             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                                                 Text(info.name, fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.titleSmall, maxLines = 2, overflow = TextOverflow.Ellipsis)
                                                 val details = listOf(info.language, info.className.takeIf { it.isNotBlank() }?.let { "Class $it" }).filterNotNull().filter { it.isNotBlank() }.joinToString(" · ")
@@ -1332,7 +1332,7 @@ private fun MineStudyApp() {
                                 Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = Color(0xFF171D2A)), shape = RoundedCornerShape(18.dp)) {
                                     Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                                         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                                            BatchThumbnail(info.thumbnail, Modifier.width(112.dp).aspectRatio(1.8f))
+                                            BatchThumbnail(info.thumbnail, Modifier.width(112.dp).aspectRatio(1.7f))
                                             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
                                                 Text(info.name, fontWeight = FontWeight.SemiBold, maxLines = 2, overflow = TextOverflow.Ellipsis)
                                                 if (info.language.isNotBlank() || info.className.isNotBlank()) {
@@ -1710,11 +1710,11 @@ private fun ItemList(
                                 model = thumbnail,
                                 contentDescription = item.title,
                                 contentScale = ContentScale.Crop,
-                                modifier = Modifier.size(width = 136.dp, height = 88.dp).clip(RoundedCornerShape(13.dp))
+                                modifier = Modifier.width(136.dp).aspectRatio(1.7f).clip(RoundedCornerShape(13.dp))
                             )
                         } else {
                             Box(
-                                Modifier.size(width = if (showThumbnails) 136.dp else 48.dp, height = if (showThumbnails) 88.dp else 48.dp)
+                                if (showThumbnails) Modifier.width(136.dp).aspectRatio(1.7f) else Modifier.size(48.dp)
                                     .background(Color(0xFF292641), RoundedCornerShape(13.dp)),
                                 contentAlignment = Alignment.Center
                             ) {
