@@ -538,7 +538,7 @@ fun DownloadCenterScreen(
                     androidx.compose.material3.Text("Max downloads at a time", style = androidx.compose.material3.MaterialTheme.typography.labelLarge, fontWeight = androidx.compose.ui.text.font.FontWeight.Medium)
                     androidx.compose.material3.Text("Choose how many files download simultaneously", style = androidx.compose.material3.MaterialTheme.typography.labelSmall, color = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant)
                 }
-                androidx.compose.material3.Box {
+                androidx.compose.foundation.layout.Box {
                     androidx.compose.material3.OutlinedButton(onClick = { parallelMenuExpanded = true }, contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 12.dp, vertical = 5.dp)) {
                         androidx.compose.material3.Text("$maxParallel at a time", style = androidx.compose.material3.MaterialTheme.typography.labelMedium)
                     }
