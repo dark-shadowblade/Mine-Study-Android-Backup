@@ -20,6 +20,7 @@ import android.view.ViewGroup
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
+import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.gestures.detectDragGestures
@@ -1674,6 +1675,34 @@ private fun MineStudyApp() {
 }
 
 @Composable
+private fun StudyItemSkeleton(showThumbnail: Boolean) {
+    val shimmer = Color(0xFF293246)
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(15.dp),
+        colors = CardDefaults.cardColors(containerColor = Color(0xFF171D2A))
+    ) {
+        Row(
+            Modifier.fillMaxWidth().padding(11.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(11.dp)
+        ) {
+            if (showThumbnail) {
+                Box(Modifier.width(112.dp).aspectRatio(1.7f).clip(RoundedCornerShape(10.dp)).background(shimmer))
+            } else {
+                Box(Modifier.size(42.dp).clip(RoundedCornerShape(11.dp)).background(shimmer))
+            }
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Box(Modifier.fillMaxWidth(0.88f).height(13.dp).clip(RoundedCornerShape(8.dp)).background(shimmer))
+                Box(Modifier.fillMaxWidth(0.58f).height(10.dp).clip(RoundedCornerShape(8.dp)).background(shimmer.copy(alpha = 0.72f)))
+                if (showThumbnail) Box(Modifier.fillMaxWidth(0.34f).height(9.dp).clip(RoundedCornerShape(8.dp)).background(shimmer.copy(alpha = 0.55f)))
+            }
+            if (showThumbnail) Box(Modifier.size(30.dp).clip(RoundedCornerShape(10.dp)).background(shimmer.copy(alpha = 0.7f)))
+        }
+    }
+}
+
+@Composable
 private fun ItemList(
     heading: String, items: List<StudyItem>, busy: Boolean, error: String,
     actionLabel: String = "Open",
@@ -1692,109 +1721,182 @@ private fun ItemList(
     starredSubjectIds: Set<String> = emptySet(),
     onToggleStar: (StudyItem) -> Unit = {},
     onSelect: (StudyItem) -> Unit, onRetry: () -> Unit
- ) {
+) {
     var searchQuery by remember(heading) { mutableStateOf("") }
     val searchable = heading == "Chapters" || showThumbnails
     val visibleItems = remember(items, searchQuery, starredSubjectIds, showSubjectStars) {
-        val filtered = if (searchQuery.isBlank()) items else items.filter { it.title.contains(searchQuery.trim(), ignoreCase = true) }
+        val filtered = if (searchQuery.isBlank()) items else items.filter {
+            it.title.contains(searchQuery.trim(), ignoreCase = true)
+        }
         if (showSubjectStars) filtered.sortedByDescending { it.id in starredSubjectIds } else filtered
     }
-    Text(heading, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-    if (searchable) {
-        Spacer(Modifier.height(6.dp))
-        OutlinedTextField(
-            value = searchQuery, onValueChange = { searchQuery = it },
-            modifier = Modifier.fillMaxWidth(), singleLine = true,
-            placeholder = { Text(if (showThumbnails) "Search lectures…" else "Search chapters…") },
-            textStyle = MaterialTheme.typography.bodyMedium,
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedTextColor = Color.White, unfocusedTextColor = Color.White,
-                focusedContainerColor = Color(0xFF101521), unfocusedContainerColor = Color(0xFF101521),
-                focusedBorderColor = Color(0xFF9B8CFF), unfocusedBorderColor = Color(0xFF343D50)
+    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text(heading, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+        if (searchable) {
+            OutlinedTextField(
+                value = searchQuery,
+                onValueChange = { searchQuery = it },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                shape = RoundedCornerShape(13.dp),
+                placeholder = { Text(if (showThumbnails) "Search lectures…" else "Search chapters…") },
+                textStyle = MaterialTheme.typography.bodyMedium,
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedTextColor = Color.White, unfocusedTextColor = Color.White,
+                    focusedContainerColor = Color(0xFF101521), unfocusedContainerColor = Color(0xFF101521),
+                    focusedBorderColor = Color(0xFF9B8CFF), unfocusedBorderColor = Color(0xFF343D50)
+                )
             )
-        )
-    }
-    Spacer(Modifier.height(8.dp))
-    if (!busy && visibleItems.isEmpty() && error.isBlank()) {
-        Text("Nothing here yet. Check your API key or try refreshing.", color = Color.Gray)
-        TextButton(onClick = onRetry) { Icon(Icons.Default.Refresh, null); Text("Refresh") }
-    }
-    LazyColumn(verticalArrangement = Arrangement.spacedBy(9.dp), contentPadding = PaddingValues(bottom = 24.dp)) {
-        items(visibleItems, key = { it.id }) { item ->
-            Card(
-                modifier = Modifier.fillMaxWidth().clickable { onSelect(item) },
-                shape = RoundedCornerShape(17.dp),
-                colors = CardDefaults.cardColors(containerColor = Color(0xFF171D2A))
+        }
+        if (busy && visibleItems.isEmpty()) {
+            LazyColumn(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+                contentPadding = PaddingValues(bottom = 20.dp)
             ) {
-                Column(Modifier.fillMaxWidth().padding(13.dp), verticalArrangement = Arrangement.spacedBy(11.dp)) {
-                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                        val thumbnail = item.raw.optString("image").takeIf { showThumbnails && it.startsWith("http", true) }
-                        if (thumbnail != null) {
-                            AsyncImage(
-                                model = thumbnail,
-                                contentDescription = item.title,
-                                contentScale = ContentScale.Crop,
-                                modifier = Modifier.width(136.dp).aspectRatio(1.7f).clip(RoundedCornerShape(13.dp))
-                            )
-                        } else {
-                            Box(
-                                if (showThumbnails) Modifier.width(136.dp).aspectRatio(1.7f) else Modifier.size(48.dp)
-                                    .background(Color(0xFF292641), RoundedCornerShape(13.dp)),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(Icons.Default.PlayArrow, null, tint = Color(0xFFB5A9FF), modifier = Modifier.size(28.dp))
-                            }
-                        }
-                        Spacer(Modifier.width(13.dp))
-                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
-                            Text(item.title, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyLarge, maxLines = 3)
-                            if (item.subtitle.isNotBlank()) Text(item.subtitle, color = Color.Gray, style = MaterialTheme.typography.bodySmall, maxLines = 2)
-                        }
-                        if (showSubjectStars) {
-                            val isStarred = item.id in starredSubjectIds
-                            IconButton(onClick = { onToggleStar(item) }, modifier = Modifier.size(38.dp)) {
-                                Icon(
-                                    imageVector = if (isStarred) Icons.Default.Star else Icons.Default.StarBorder,
-                                    contentDescription = if (isStarred) "Remove from important subjects" else "Mark subject important",
-                                    tint = if (isStarred) Color(0xFFFFC857) else Color(0xFF858B98),
-                                    modifier = Modifier.size(23.dp)
-                                )
-                            }
-                        }
+                items(4) { StudyItemSkeleton(showThumbnails) }
+            }
+        } else if (!busy && visibleItems.isEmpty() && error.isBlank()) {
+            Column(
+                Modifier.fillMaxWidth().padding(vertical = 22.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(5.dp)
+            ) {
+                Icon(Icons.Default.MenuBook, null, tint = Color(0xFF858B98), modifier = Modifier.size(27.dp))
+                Text(
+                    if (searchQuery.isNotBlank()) "No matches for “$searchQuery”" else "Nothing here yet",
+                    color = Color(0xFFB8C1D1),
+                    style = MaterialTheme.typography.bodyMedium
+                )
+                Text(
+                    if (searchQuery.isNotBlank()) "Try another search." else "Check your connection and try again.",
+                    color = Color.Gray,
+                    style = MaterialTheme.typography.bodySmall
+                )
+                TextButton(onClick = { if (searchQuery.isNotBlank()) searchQuery = "" else onRetry() }) {
+                    Text(if (searchQuery.isNotBlank()) "Clear search" else "Retry")
+                }
+            }
+        } else {
+            LazyColumn(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+                contentPadding = PaddingValues(bottom = 20.dp)
+            ) {
+                items(visibleItems, key = { it.id }) { item ->
+                    val thumbnail = item.raw.optString("image").takeIf { showThumbnails && it.startsWith("http", true) }
+                    val cleanTitle = item.title.replace(Regex("[\\\\/:*?\\\"<>|]"), "_").trim()
+                    val itemKey = downloadItemKey(item)
+                    val downloaded = downloadRecords.any { record ->
+                        record.category == downloadCategory && (record.itemKey == itemKey ||
+                            (record.itemKey.isBlank() && record.name.substringBeforeLast('.').equals(cleanTitle, ignoreCase = true)))
                     }
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(9.dp)) {
-                        OutlinedButton(onClick = { onSelect(item) }, modifier = Modifier.weight(1f), contentPadding = PaddingValues(horizontal = 10.dp, vertical = 8.dp)) {
-                            Text(actionLabel, maxLines = 1)
-                        }
-                        if (onDownload != null) {
-                            val cleanTitle = item.title.replace(Regex("[\\\\/:*?\"<>|]"), "_").trim()
-                            val itemKey = downloadItemKey(item)
-                            val downloaded = downloadRecords.any { record ->
-                                record.category == downloadCategory && (record.itemKey == itemKey ||
-                                    (record.itemKey.isBlank() && record.name.substringBeforeLast('.').equals(cleanTitle, ignoreCase = true)))
-                            }
-                            val queueEntry = downloadQueueItems.firstOrNull { it.itemKey == itemKey && it.category == downloadCategory }
-                            val downloading = itemKey in downloadingKeys || (activeDownloadKey == itemKey && activeDownloadCategory == downloadCategory)
-                            val itemPercent = queueEntry?.takeIf { it.total > 0L }?.let {
-                                ((it.bytes * 100L) / it.total).toInt().coerceIn(0, 99)
-                            } ?: if (activeDownloadKey == itemKey && activeDownloadCategory == downloadCategory) activeDownloadPercent else 0
-                            IconButton(
-                                onClick = { if (!downloaded && !downloading) onDownload(item) },
-                                enabled = !downloaded && !downloading,
-                                modifier = Modifier.size(44.dp)
-                            ) {
-                                when {
-                                    downloading -> Box(contentAlignment = Alignment.Center, modifier = Modifier.size(34.dp)) {
-                                        CircularProgressIndicator(modifier = Modifier.size(25.dp), strokeWidth = 2.dp, color = Color(0xFFB5A9FF))
-                                        Text("${if (queueEntry?.active == false) "Q" else "$itemPercent%"}", fontSize = 8.sp, color = Color.White, fontWeight = FontWeight.SemiBold)
+                    val queueEntry = downloadQueueItems.firstOrNull { it.itemKey == itemKey && it.category == downloadCategory }
+                    val downloading = itemKey in downloadingKeys || (activeDownloadKey == itemKey && activeDownloadCategory == downloadCategory)
+                    val itemPercent = queueEntry?.takeIf { it.total > 0L }?.let {
+                        ((it.bytes * 100L) / it.total).toInt().coerceIn(0, 99)
+                    } ?: if (activeDownloadKey == itemKey && activeDownloadCategory == downloadCategory) activeDownloadPercent else 0
+
+                    Card(
+                        modifier = Modifier.fillMaxWidth().animateContentSize().clickable { onSelect(item) },
+                        shape = RoundedCornerShape(15.dp),
+                        colors = CardDefaults.cardColors(containerColor = Color(0xFF171D2A))
+                    ) {
+                        Row(
+                            Modifier.fillMaxWidth().padding(10.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            if (showThumbnails) {
+                                Box(
+                                    Modifier.width(112.dp).aspectRatio(1.7f).clip(RoundedCornerShape(10.dp))
+                                        .background(Color(0xFF292641)),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    if (thumbnail != null) {
+                                        AsyncImage(
+                                            model = thumbnail,
+                                            contentDescription = item.title,
+                                            contentScale = ContentScale.Crop,
+                                            modifier = Modifier.fillMaxSize()
+                                        )
+                                    } else {
+                                        Icon(Icons.Default.PlayArrow, null, tint = Color(0xFFB5A9FF), modifier = Modifier.size(27.dp))
                                     }
-                                    downloaded -> Icon(Icons.Default.CheckCircle, contentDescription = "Downloaded", tint = Color(0xFF38C879), modifier = Modifier.size(25.dp))
-                                    else -> Icon(Icons.Default.Download, contentDescription = "Download", tint = Color(0xFF858B98), modifier = Modifier.size(25.dp))
                                 }
+                            } else {
+                                Box(
+                                    Modifier.size(42.dp).clip(RoundedCornerShape(11.dp)).background(Color(0xFF292641)),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        if (showSubjectStars) Icons.Default.MenuBook else Icons.Default.ArrowForward,
+                                        null, tint = Color(0xFFB5A9FF), modifier = Modifier.size(21.dp)
+                                    )
+                                }
+                            }
+                            Column(
+                                Modifier.weight(1f),
+                                verticalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                Text(
+                                    item.title,
+                                    fontWeight = FontWeight.SemiBold,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = Color.White,
+                                    maxLines = if (showThumbnails) 2 else 2,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                                if (item.subtitle.isNotBlank()) {
+                                    Text(item.subtitle, color = Color(0xFF9AA5BA), style = MaterialTheme.typography.labelSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                }
+                                if (showThumbnails) {
+                                    Text(
+                                        if (downloaded) "Downloaded" else if (downloading) {
+                                            if (queueEntry?.active == false) "In queue" else "Downloading · $itemPercent%"
+                                        } else actionLabel,
+                                        color = when {
+                                            downloaded -> Color(0xFF71D6C5)
+                                            downloading -> Color(0xFFB5A9FF)
+                                            else -> Color(0xFF9AA5BA)
+                                        },
+                                        style = MaterialTheme.typography.labelSmall,
+                                        maxLines = 1
+                                    )
+                                }
+                            }
+                            if (showSubjectStars) {
+                                val isStarred = item.id in starredSubjectIds
+                                IconButton(onClick = { onToggleStar(item) }, modifier = Modifier.size(36.dp)) {
+                                    Icon(
+                                        imageVector = if (isStarred) Icons.Default.Star else Icons.Default.StarBorder,
+                                        contentDescription = if (isStarred) "Remove from important subjects" else "Mark subject important",
+                                        tint = if (isStarred) Color(0xFFFFC857) else Color(0xFF858B98),
+                                        modifier = Modifier.size(22.dp)
+                                    )
+                                }
+                            } else if (onDownload != null) {
+                                IconButton(
+                                    onClick = { if (!downloaded && !downloading) onDownload(item) },
+                                    enabled = !downloaded && !downloading,
+                                    modifier = Modifier.size(36.dp)
+                                ) {
+                                    when {
+                                        downloading -> Box(contentAlignment = Alignment.Center, modifier = Modifier.size(29.dp)) {
+                                            CircularProgressIndicator(Modifier.size(25.dp), strokeWidth = 2.dp, color = Color(0xFFB5A9FF))
+                                            Text(if (queueEntry?.active == false) "Q" else "$itemPercent%", fontSize = 7.sp, color = Color.White)
+                                        }
+                                        downloaded -> Icon(Icons.Default.CheckCircle, "Downloaded", tint = Color(0xFF38C879), modifier = Modifier.size(22.dp))
+                                        else -> Icon(Icons.Default.Download, "Download", tint = Color(0xFF858B98), modifier = Modifier.size(22.dp))
+                                    }
+                                }
+                            } else {
+                                Icon(Icons.Default.ArrowForward, null, tint = Color(0xFF69758A), modifier = Modifier.size(17.dp))
                             }
                         }
                     }
                 }
+                if (busy) item { StudyItemSkeleton(showThumbnails) }
             }
         }
     }
