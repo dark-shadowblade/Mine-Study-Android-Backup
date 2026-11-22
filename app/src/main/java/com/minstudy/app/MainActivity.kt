@@ -1064,9 +1064,6 @@ private fun MineStudyApp() {
                             IconButton(onClick = { screen = "download_center" }) {
                                 Icon(Icons.Default.Download, contentDescription = "Download Center")
                             }
-                            IconButton(onClick = { downloadRecords = DownloadRepository.list(context); screen = "downloads" }) {
-                                Icon(Icons.Default.FolderOpen, contentDescription = "Downloads")
-                            }
                             IconButton(onClick = { showSettings = true }) { Icon(Icons.Default.Settings, contentDescription = "Settings") }
                         },
                         colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFF0B0D14))
@@ -1074,7 +1071,7 @@ private fun MineStudyApp() {
                 }
             },
             bottomBar = {
-                if (screen in setOf("home", "all_batches", "my_batches")) {
+                if (screen in setOf("home", "all_batches", "my_batches", "downloads")) {
                     NavigationBar(containerColor = Color(0xFF111622)) {
                         NavigationBarItem(
                             selected = screen == "home",
@@ -1086,7 +1083,7 @@ private fun MineStudyApp() {
                             selected = screen == "all_batches",
                             onClick = { screen = "all_batches" },
                             icon = { Icon(Icons.Default.Search, contentDescription = null) },
-                            label = { Text("All batches") }
+                            label = { Text("Batches") }
                         )
                         NavigationBarItem(
                             selected = screen == "my_batches",
@@ -1094,9 +1091,14 @@ private fun MineStudyApp() {
                             icon = { Icon(Icons.Default.FolderOpen, contentDescription = null) },
                             label = { Text("My batches") }
                         )
+                        NavigationBarItem(
+                            selected = screen == "downloads",
+                            onClick = { downloadRecords = DownloadRepository.list(context); screen = "downloads" },
+                            icon = { Icon(Icons.Default.Download, contentDescription = null) },
+                            label = { Text("Gallery") }
+                        )
                     }
-                }
-            },
+                }            },
             containerColor = Color(0xFF0B0D14)
         ) { padding ->
             Column(Modifier.fillMaxSize().padding(padding).padding(horizontal = if (screen == "player") 0.dp else 18.dp)) {
@@ -1519,10 +1521,8 @@ private fun MineStudyApp() {
                     )
                     "download_center" -> DownloadCenterScreen(
                         queueItems = downloadState.queueItems,
-                        maxParallel = downloadState.maxParallel,
                         runningCount = downloadState.runningCount,
                         queuedCount = downloadState.queuedCount,
-                        onSetParallel = { DownloadService.setParallelLimit(context, it) },
                         onPause = { DownloadService.pauseItem(context, it) },
                         onResume = { DownloadService.resumeItem(context, it) },
                         onCancelItem = { DownloadService.cancelItem(context, it) },
@@ -1530,8 +1530,7 @@ private fun MineStudyApp() {
                         onMove = { id, direction -> DownloadService.moveQueued(context, id, direction) },
                         onRemove = { DownloadService.removeQueued(context, it) },
                         onCancelAll = { DownloadService.cancel(context) },
-                        onClearQueue = { DownloadService.clearQueue(context) },
-                        onOpenGallery = { downloadRecords = DownloadRepository.list(context); screen = "downloads" }
+                        onClearQueue = { DownloadService.clearQueue(context) }
                     )
                     "downloads" -> DownloadGallery(
                         records = downloadRecords,
