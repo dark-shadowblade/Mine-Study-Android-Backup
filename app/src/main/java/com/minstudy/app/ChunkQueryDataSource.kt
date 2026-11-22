@@ -11,7 +11,7 @@ import java.net.URL
 
 /** Adapts the CDN's ?s=start&e=end byte-range protocol to ExoPlayer. */
 class ChunkQueryDataSource : BaseDataSource(false) {
-    companion object { private const val CHUNK_SIZE = 1024 * 1024 }
+    companion object { private const val CHUNK_SIZE = 2 * 1024 * 1024 }
     private var originalUri: Uri? = null
     private var connection: HttpURLConnection? = null
     private var stream: java.io.InputStream? = null
@@ -55,7 +55,7 @@ class ChunkQueryDataSource : BaseDataSource(false) {
         if (!base.scheme.equals("https", true) || !Regex("a\\d+\\.stmvv1\\.xyz", RegexOption.IGNORE_CASE).matches(base.host ?: "")) {
             throw IOException("Invalid video CDN host")
         }
-        val builder = base.buildUpon()
+        val builder = base.buildUpon().clearQuery()
         for (name in base.queryParameterNames) {
             if (name != "s" && name != "e") {
                 for (value in base.getQueryParameters(name)) builder.appendQueryParameter(name, value)
