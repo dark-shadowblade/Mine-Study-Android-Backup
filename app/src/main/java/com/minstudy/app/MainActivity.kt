@@ -42,6 +42,7 @@ import androidx.compose.material.icons.filled.ArrowForward
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.Fullscreen
 import androidx.compose.material.icons.filled.FullscreenExit
@@ -894,6 +895,19 @@ private fun MineStudyApp() {
         }
     }
 
+    fun cancelBatchSearch() {
+        batchSearchJob?.cancel()
+        batchSearchGeneration++
+        batchSearchLoading = false
+        batchSearchError = ""
+        batchSearchText = ""
+        batchSearchResults = emptyList()
+        batchSearchPage = 1
+        batchSearchTotalPages = 1
+        batchSearchExecuted = false
+        scope.launch { batchListState.scrollToItem(0) }
+    }
+
     fun searchBatches(page: Int = 1) {
         if (apiKey.isBlank()) {
             batchSearchError = "Add and verify your API key in Settings first."
@@ -1237,11 +1251,21 @@ private fun MineStudyApp() {
                             label = { Text("Search UPSC batches") },
                             placeholder = { Text("e.g. Prarambh 2027") },
                             trailingIcon = {
-                                IconButton(onClick = {
-                                    scope.launch { batchListState.scrollToItem(0) }
-                                    searchBatches(1)
-                                }) {
-                                    Icon(Icons.Default.Search, contentDescription = "Search batches")
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    if (batchSearchText.isNotBlank() || batchSearchLoading) {
+                                        IconButton(onClick = { cancelBatchSearch() }) {
+                                            Icon(Icons.Default.Close, contentDescription = "Cancel search and clear")
+                                        }
+                                    }
+                                    IconButton(
+                                        onClick = {
+                                            scope.launch { batchListState.scrollToItem(0) }
+                                            searchBatches(1)
+                                        },
+                                        enabled = !batchSearchLoading
+                                    ) {
+                                        Icon(Icons.Default.Search, contentDescription = "Search batches")
+                                    }
                                 }
                             }
                         )
