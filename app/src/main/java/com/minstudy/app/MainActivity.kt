@@ -1155,7 +1155,7 @@ private fun MineStudyApp() {
                                                 val batchDetails = listOf(currentBatchInfo.language, currentBatchInfo.className.takeIf { it.isNotBlank() }?.let { "Class $it" }).filterNotNull().filter { it.isNotBlank() }.joinToString(" · ")
                                                 if (batchDetails.isNotBlank()) Text(batchDetails, color = Color(0xFF9AA5BA), style = MaterialTheme.typography.labelSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
                                             }
-                                            Icon(Icons.Default.ArrowDropDown, null, tint = Color(0xFFB5A9FF), modifier = Modifier.size(22.dp))
+                                            Text("⌄", color = Color(0xFFB5A9FF), style = MaterialTheme.typography.titleLarge)
                                         }
                                     }
                                     DropdownMenu(
