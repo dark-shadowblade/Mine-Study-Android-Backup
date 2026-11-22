@@ -497,11 +497,14 @@ private fun formatDownloadBytes(bytes: Long): String {
 }
 
 
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @androidx.compose.runtime.Composable
 fun DownloadCenterScreen(
     queueItems: List<DownloadQueueEntry>,
     runningCount: Int,
     queuedCount: Int,
+    maxParallel: Int,
+    onSetMaxParallel: (Int) -> Unit,
     onPause: (String) -> Unit,
     onResume: (String) -> Unit,
     onCancelItem: (String) -> Unit,
@@ -514,6 +517,7 @@ fun DownloadCenterScreen(
     var confirmAction by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf("") }
     var confirmCancelId by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf<String?>(null) }
     var selectedDownloadIds by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(setOf<String>()) }
+    var parallelMenuExpanded by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
     androidx.compose.foundation.lazy.LazyColumn(
         modifier = Modifier.fillMaxSize(),
         verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(10.dp),
@@ -525,16 +529,29 @@ fun DownloadCenterScreen(
                     androidx.compose.material3.Text("Download Center", style = androidx.compose.material3.MaterialTheme.typography.titleLarge, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold)
                     androidx.compose.material3.Text("$runningCount active  ·  $queuedCount queued", style = androidx.compose.material3.MaterialTheme.typography.labelSmall, color = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant)
                 }
-                androidx.compose.material3.OutlinedButton(onClick = onOpenGallery, contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 10.dp, vertical = 6.dp)) {
-                    androidx.compose.material3.Icon(Icons.Default.MenuBook, null, modifier = Modifier.size(16.dp))
-                    androidx.compose.foundation.layout.Spacer(Modifier.width(5.dp))
-                    androidx.compose.material3.Text("Files", style = androidx.compose.material3.MaterialTheme.typography.labelMedium)
-                }
+
             }
         }
         item {
             androidx.compose.foundation.layout.Row(Modifier.fillMaxWidth(), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
-                androidx.compose.material3.Text("Downloads", Modifier.weight(1f), style = androidx.compose.material3.MaterialTheme.typography.titleMedium, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold)
+                androidx.compose.foundation.layout.Column(Modifier.weight(1f)) {
+                    androidx.compose.material3.Text("Max downloads at a time", style = androidx.compose.material3.MaterialTheme.typography.labelLarge, fontWeight = androidx.compose.ui.text.font.FontWeight.Medium)
+                    androidx.compose.material3.Text("Choose how many files download simultaneously", style = androidx.compose.material3.MaterialTheme.typography.labelSmall, color = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                androidx.compose.material3.Box {
+                    androidx.compose.material3.OutlinedButton(onClick = { parallelMenuExpanded = true }, contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 12.dp, vertical = 5.dp)) {
+                        androidx.compose.material3.Text("$maxParallel at a time", style = androidx.compose.material3.MaterialTheme.typography.labelMedium)
+                    }
+                    androidx.compose.material3.DropdownMenu(expanded = parallelMenuExpanded, onDismissRequest = { parallelMenuExpanded = false }) {
+                        (1..5).forEach { limit ->
+                            androidx.compose.material3.DropdownMenuItem(
+                                text = { androidx.compose.material3.Text("$limit " + if (limit == 1) "download" else "downloads") },
+                                onClick = { onSetMaxParallel(limit); parallelMenuExpanded = false },
+                                trailingIcon = { if (limit == maxParallel) androidx.compose.material3.Icon(Icons.Default.CheckCircle, contentDescription = "Selected", tint = androidx.compose.material3.MaterialTheme.colorScheme.primary) }
+                            )
+                        }
+                    }
+                }
             }
         }
         if (queueItems.isNotEmpty()) {
