@@ -1103,7 +1103,7 @@ private fun MineStudyApp() {
                                         Text("Connect API key", fontWeight = FontWeight.SemiBold)
                                         Text("Set up access to your batches and lectures", color = Color(0xFF9AA5BA), style = MaterialTheme.typography.bodySmall)
                                     }
-                                    Icon(Icons.Default.ChevronRight, null, tint = Color(0xFF9AA5BA))
+                                    Icon(Icons.Default.ArrowForward, null, tint = Color(0xFF9AA5BA))
                                 }
                             }
                         } else {
@@ -1141,7 +1141,7 @@ private fun MineStudyApp() {
                                                 val batchDetails = listOf(currentBatchInfo.language, currentBatchInfo.className.takeIf { it.isNotBlank() }?.let { "Class $it" }).filterNotNull().filter { it.isNotBlank() }.joinToString(" · ")
                                                 if (batchDetails.isNotBlank()) Text(batchDetails, color = Color(0xFF9AA5BA), style = MaterialTheme.typography.labelSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
                                             }
-                                            Icon(Icons.Default.ExpandMore, null, tint = Color(0xFFB5A9FF), modifier = Modifier.size(22.dp))
+                                            Icon(Icons.Default.ArrowDropDown, null, tint = Color(0xFFB5A9FF), modifier = Modifier.size(22.dp))
                                         }
                                     }
                                     DropdownMenu(
@@ -1159,7 +1159,7 @@ private fun MineStudyApp() {
                                                         if (info.language.isNotBlank()) Text(info.language, style = MaterialTheme.typography.labelSmall, color = Color.Gray, maxLines = 1)
                                                     }
                                                 },
-                                                trailingIcon = { if (id == batch) Icon(Icons.Default.Check, null, tint = Color(0xFF71D6C5)) },
+                                                trailingIcon = { if (id == batch) Icon(Icons.Default.CheckCircle, null, tint = Color(0xFF71D6C5)) },
                                                 onClick = {
                                                     showHomeBatchMenu = false
                                                     if (id != batch) openBatch(info)
@@ -1185,13 +1185,13 @@ private fun MineStudyApp() {
                                             verticalAlignment = Alignment.CenterVertically,
                                             horizontalArrangement = Arrangement.spacedBy(10.dp)
                                         ) {
-                                            Icon(Icons.Default.PlayCircle, null, tint = Color(0xFFB5A9FF), modifier = Modifier.size(25.dp))
+                                            Icon(Icons.Default.PlayArrow, null, tint = Color(0xFFB5A9FF), modifier = Modifier.size(25.dp))
                                             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                                                 Text("Continue learning", color = Color(0xFFB5A9FF), style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.SemiBold)
                                                 Text(lastChapterTitle, fontWeight = FontWeight.Medium, style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
                                                 Text(lastSubjectTitle, color = Color(0xFF9AA5BA), style = MaterialTheme.typography.labelSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
                                             }
-                                            Icon(Icons.Default.ChevronRight, null, tint = Color(0xFF9AA5BA), modifier = Modifier.size(20.dp))
+                                            Icon(Icons.Default.ArrowForward, null, tint = Color(0xFF9AA5BA), modifier = Modifier.size(20.dp))
                                         }
                                     }
                                 }
