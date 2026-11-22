@@ -1098,7 +1098,8 @@ private fun MineStudyApp() {
                             label = { Text("Gallery") }
                         )
                     }
-                }            },
+                }
+            },
             containerColor = Color(0xFF0B0D14)
         ) { padding ->
             Column(Modifier.fillMaxSize().padding(padding).padding(horizontal = if (screen == "player") 0.dp else 18.dp)) {
