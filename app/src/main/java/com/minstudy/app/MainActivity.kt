@@ -453,7 +453,7 @@ private fun MineStudyApp() {
     var error by remember { mutableStateOf("") }
     var keyLink by remember { mutableStateOf("") }
     var keyStatus by remember { mutableStateOf("") }
-    var showSettings by remember { mutableStateOf(false) }
+    var showSettings by remember { mutableStateOf(apiKey.isBlank()) }
     var downloadRecords by remember { mutableStateOf(DownloadRepository.list(context)) }
     var openedPdfUri by remember { mutableStateOf<Uri?>(null) }
     var openedPdfTitle by remember { mutableStateOf("") }
@@ -1584,7 +1584,7 @@ private fun MineStudyApp() {
 
     if (showSettings) {
         AlertDialog(
-            onDismissRequest = { showSettings = false },
+            onDismissRequest = { if (api.apiKey.isNotBlank()) showSettings = false },
             shape = RoundedCornerShape(22.dp),
             containerColor = Color(0xFF141A26),
             tonalElevation = 0.dp,
@@ -1672,7 +1672,7 @@ private fun MineStudyApp() {
                 }
             },
             confirmButton = {},
-            dismissButton = { TextButton(onClick = { showSettings = false }) { Text("Close") } }
+            dismissButton = { if (api.apiKey.isNotBlank()) TextButton(onClick = { showSettings = false }) { Text("Close") } }
         )
     }
 }
