@@ -92,6 +92,7 @@ import androidx.core.view.WindowInsetsControllerCompat
 import coil.compose.AsyncImage
 import androidx.lifecycle.lifecycleScope
 import com.google.android.exoplayer2.ExoPlayer
+import com.google.android.exoplayer2.DefaultLoadControl
 import com.google.android.exoplayer2.source.DefaultMediaSourceFactory
 import com.google.android.exoplayer2.MediaItem
 import com.google.android.exoplayer2.ui.PlayerView
@@ -2014,7 +2015,12 @@ private fun VideoScreen(
         } else {
             ChunkQueryDataSourceFactory()
         }
+        val loadControl = DefaultLoadControl.Builder()
+            .setBufferDurationsMs(12_000, 50_000, 1_000, 2_500)
+            .setPrioritizeTimeOverSizeThresholds(true)
+            .build()
         ExoPlayer.Builder(context)
+            .setLoadControl(loadControl)
             .setMediaSourceFactory(DefaultMediaSourceFactory(sourceFactory))
             .setSeekBackIncrementMs(10_000L)
             .setSeekForwardIncrementMs(10_000L)
