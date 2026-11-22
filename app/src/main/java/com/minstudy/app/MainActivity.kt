@@ -1524,6 +1524,8 @@ private fun MineStudyApp() {
                         queueItems = downloadState.queueItems,
                         runningCount = downloadState.runningCount,
                         queuedCount = downloadState.queuedCount,
+                        maxParallel = downloadState.maxParallel,
+                        onSetMaxParallel = { DownloadService.setParallelLimit(context, it) },
                         onPause = { DownloadService.pauseItem(context, it) },
                         onResume = { DownloadService.resumeItem(context, it) },
                         onCancelItem = { DownloadService.cancelItem(context, it) },
