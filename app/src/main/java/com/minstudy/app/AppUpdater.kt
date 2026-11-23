@@ -125,7 +125,8 @@ private fun findAppUpdate(context: Context): AppRelease? {
         val tag = json.optString("tag_name")
         val remoteCode = tag.removePrefix("v").substringAfterLast('.').toLongOrNull() ?: return null
         val packageInfo = context.packageManager.getPackageInfo(context.packageName, 0)
-        @Suppress("DEPRECATION")\n        val installedCode = if (Build.VERSION.SDK_INT >= 28) packageInfo.longVersionCode else packageInfo.versionCode.toLong()
+        @Suppress("DEPRECATION")
+        val installedCode = if (Build.VERSION.SDK_INT >= 28) packageInfo.longVersionCode else packageInfo.versionCode.toLong()
         if (remoteCode <= installedCode) return null
         val assets = json.optJSONArray("assets") ?: return null
         var apkUrl = ""
