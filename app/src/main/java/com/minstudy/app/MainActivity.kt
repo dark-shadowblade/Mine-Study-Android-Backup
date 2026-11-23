@@ -1166,16 +1166,11 @@ private fun MineStudyApp() {
                                         color = Color(0xFF9AA5BA),
                                         style = MaterialTheme.typography.bodySmall
                                     )
-                                    Button(
-                                        onClick = { screen = "all_batches" },
-                                        modifier = Modifier.fillMaxWidth(),
-                                        shape = RoundedCornerShape(12.dp)
-                                    ) {
-                                        Icon(Icons.Default.Add, null, modifier = Modifier.size(18.dp))
-                                        Spacer(Modifier.width(7.dp))
-                                        Text("Add batch")
-                                    }
-                                    TextButton(onClick = { screen = "my_batches" }) { Text("Enter batch ID manually") }
+                                    Text(
+                                        "Open All batches to find and add a batch.",
+                                        color = Color(0xFF9AA5BA),
+                                        style = MaterialTheme.typography.bodySmall
+                                    )
                                 }
                             }
                         } else {
@@ -1310,6 +1305,11 @@ private fun MineStudyApp() {
                     }
                     "all_batches" -> {
                         Text("All batches", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                        Text(
+                            "Find a batch and tap Add batch to save it to My batches.",
+                            color = Color(0xFF9AA5BA),
+                            style = MaterialTheme.typography.bodySmall
+                        )
                         Spacer(Modifier.height(8.dp))
                         OutlinedTextField(
                             value = batchSearchText,
@@ -1344,7 +1344,7 @@ private fun MineStudyApp() {
                             }
                         )
                         Spacer(Modifier.height(8.dp))
-                        if (batchSearchError.isNotBlank()) Text(batchSearchError, color = Color(0xFFFF8A8A), style = MaterialTheme.typography.bodySmall)
+                        if (batchSearchError.isNotBlank()) Text(batchSearchError, color = Color(0xFFB8C1D1), style = MaterialTheme.typography.bodySmall)
                         if (batchSearchLoading) LinearProgressIndicator(Modifier.fillMaxWidth())
                         LazyColumn(state = batchListState, verticalArrangement = Arrangement.spacedBy(8.dp), contentPadding = PaddingValues(bottom = 12.dp)) {
                             items(batchSearchResults, key = { it.id }) { info ->
