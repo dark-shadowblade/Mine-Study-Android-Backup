@@ -162,7 +162,7 @@ private class StudyApi(private val context: Context) {
         }
 
     var batchId: String
-        get() = prefs.getString("batch_id", BATCH_ONE) ?: BATCH_ONE
+        get() = prefs.getString("batch_id", "") ?: ""
         set(value) { prefs.edit().putString("batch_id", value).apply() }
 
     // Mirrors Mine-Study/index.html request(): validate the envelope, then
@@ -288,7 +288,9 @@ private class StudyApi(private val context: Context) {
 
     suspend fun verifyKey(candidate: String, onStatus: (String) -> Unit = {}): Int {
         if (candidate.isBlank()) throw IllegalStateException("Enter an API key first")
-        val subjectPath = "/batch/$batchId/subject"
+        // Keep the legacy target only for API-key validation; it is never
+        // selected, saved, or shown as a user's batch.
+        val subjectPath = "/batch/${batchId.ifBlank { BATCH_ONE }}/subject"
 
         // Check first: a key may already be activated even after app data is cleared.
         onStatus("Checking whether API key is already activated...")
@@ -393,8 +395,8 @@ private fun MineStudyApp() {
     var apiKey by remember { mutableStateOf(api.apiKey) }
     var batch by remember { mutableStateOf(api.batchId) }
     var savedBatchIds by remember {
-        mutableStateOf((context.getSharedPreferences("mine_study", Context.MODE_PRIVATE)
-            .getStringSet("saved_batch_ids", emptySet())?.toSet() ?: emptySet()) + api.batchId)
+        mutableStateOf(context.getSharedPreferences("mine_study", Context.MODE_PRIVATE)
+            .getStringSet("saved_batch_ids", emptySet())?.toSet() ?: emptySet())
     }
     var batchSearchText by remember { mutableStateOf("") }
     var manualBatchId by remember { mutableStateOf("") }
@@ -527,7 +529,13 @@ private fun MineStudyApp() {
                 keyStatus = "Verified"
                 error = ""
                 showSettings = false
-                loadSubjects()
+                if (batch.isNotBlank()) {
+                    loadSubjects()
+                } else {
+                    // Fresh installs start with no selected batch.
+                    screen = "home"
+                    error = ""
+                }
             } catch (e: Exception) {
                 keyStatus = "Key verification failed. Tap Generate and paste a new key."
             }
@@ -1122,6 +1130,37 @@ private fun MineStudyApp() {
                                         Text("Set up access to your batches and lectures", color = Color(0xFF9AA5BA), style = MaterialTheme.typography.bodySmall)
                                     }
                                     Icon(Icons.Default.ArrowForward, null, tint = Color(0xFF9AA5BA))
+                                }
+                            }
+                        } else if (batch.isBlank()) {
+                            Card(
+                                Modifier.fillMaxWidth(),
+                                colors = CardDefaults.cardColors(containerColor = Color(0xFF171D2A)),
+                                shape = RoundedCornerShape(18.dp),
+                                border = BorderStroke(1.dp, Color(0xFF30394B))
+                            ) {
+                                Column(
+                                    Modifier.fillMaxWidth().padding(24.dp),
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                                ) {
+                                    Icon(Icons.Default.MenuBook, null, tint = Color(0xFFB5A9FF), modifier = Modifier.size(42.dp))
+                                    Text("No batch added yet", fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.titleMedium)
+                                    Text(
+                                        "Add a batch to see your subjects, lectures and study material here.",
+                                        color = Color(0xFF9AA5BA),
+                                        style = MaterialTheme.typography.bodySmall
+                                    )
+                                    Button(
+                                        onClick = { screen = "all_batches" },
+                                        modifier = Modifier.fillMaxWidth(),
+                                        shape = RoundedCornerShape(12.dp)
+                                    ) {
+                                        Icon(Icons.Default.Add, null, modifier = Modifier.size(18.dp))
+                                        Spacer(Modifier.width(7.dp))
+                                        Text("Add batch")
+                                    }
+                                    TextButton(onClick = { screen = "my_batches" }) { Text("Enter batch ID manually") }
                                 }
                             }
                         } else {
