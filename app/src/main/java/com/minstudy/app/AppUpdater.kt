@@ -123,7 +123,7 @@ internal fun AutoUpdateChecker() {
                                     progress = value
                                 }
                                 progress = 1f
-                            } catch (_: Exception) {
+                            } catch (error: Exception) {
                                 downloadedApk = null
                                 val message = if (
                                     error.message?.contains("signing certificate") == true
@@ -252,11 +252,12 @@ private suspend fun downloadUpdate(
         }
 
         @Suppress("DEPRECATION")
+        val archiveFlags = PackageManager.GET_ACTIVITIES or
+            if (Build.VERSION.SDK_INT >= 28) PackageManager.GET_SIGNING_CERTIFICATES
+            else PackageManager.GET_SIGNATURES
         val archiveInfo = context.packageManager.getPackageArchiveInfo(
             temporary.absolutePath,
-            PackageManager.GET_ACTIVITIES or
-                if (Build.VERSION.SDK_INT >= 28) PackageManager.GET_SIGNING_CERTIFICATES
-                else @Suppress("DEPRECATION") PackageManager.GET_SIGNATURES
+            archiveFlags
         ) ?: throw IllegalStateException("Invalid APK")
         @Suppress("DEPRECATION")
         val archiveVersion = if (Build.VERSION.SDK_INT >= 28) {
@@ -270,10 +271,15 @@ private suspend fun downloadUpdate(
             throw IllegalStateException("APK does not match this update")
         }
 
+        @Suppress("DEPRECATION")
+        val installedFlags = if (Build.VERSION.SDK_INT >= 28) {
+            PackageManager.GET_SIGNING_CERTIFICATES
+        } else {
+            PackageManager.GET_SIGNATURES
+        }
         val installedInfo = context.packageManager.getPackageInfo(
             context.packageName,
-            if (Build.VERSION.SDK_INT >= 28) PackageManager.GET_SIGNING_CERTIFICATES
-            else @Suppress("DEPRECATION") PackageManager.GET_SIGNATURES
+            installedFlags
         )
         val installedSigners = if (Build.VERSION.SDK_INT >= 28) {
             installedInfo.signingInfo?.apkContentsSigners?.map { it.toCharsString() }?.toSet()
