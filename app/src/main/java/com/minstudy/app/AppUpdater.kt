@@ -29,6 +29,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.core.content.FileProvider
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -41,8 +42,7 @@ import java.net.URL
 private data class AppRelease(
     val versionCode: Long,
     val versionName: String,
-    val apkUrl: String,
-    val notes: String
+    val apkUrl: String
 )
 
 @Composable
@@ -75,23 +75,30 @@ internal fun AutoUpdateChecker() {
 
     AlertDialog(
         onDismissRequest = { if (!downloading) dismissUpdate() },
-        title = { Text("Update available") },
+        shape = RoundedCornerShape(24.dp),
+        containerColor = MaterialTheme.colorScheme.surface,
+        tonalElevation = 8.dp,
+        title = {
+            Text(
+                "v${available.versionName}",
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold
+            )
+        },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Text("Mine Study ${available.versionName} is ready.")
-                if (available.notes.isNotBlank()) {
-                    Text(
-                        available.notes,
-                        style = MaterialTheme.typography.bodySmall,
-                        maxLines = 4
-                    )
-                }
-                if (downloading) {
+            if (downloading) {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     LinearProgressIndicator(
                         progress = { progress },
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier.fillMaxWidth(),
+                        color = MaterialTheme.colorScheme.primary,
+                        trackColor = MaterialTheme.colorScheme.surfaceVariant
                     )
-                    Text("Downloading ${(progress * 100).toInt()}%")
+                    Text(
+                        "${(progress * 100).toInt()}%",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 }
             }
         },
@@ -119,7 +126,7 @@ internal fun AutoUpdateChecker() {
                                 downloadedApk = null
                                 Toast.makeText(
                                     context,
-                                    "Update download failed. Please try again.",
+                                    "Update failed",
                                     Toast.LENGTH_SHORT
                                 ).show()
                             } finally {
@@ -130,18 +137,22 @@ internal fun AutoUpdateChecker() {
                 }
             ) {
                 if (downloading) {
-                    CircularProgressIndicator()
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(18.dp),
+                        strokeWidth = 2.dp,
+                        color = MaterialTheme.colorScheme.onPrimary
+                    )
                 } else {
-                    Text(if (downloadedApk?.exists() == true) "Install update" else "Update")
+                    Text(if (downloadedApk?.exists() == true) "Install" else "Update")
                 }
             }
         },
         dismissButton = {
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                TextButton(
-                    enabled = !downloading,
-                    onClick = { dismissUpdate() }
-                ) { Text("Later") }
+            TextButton(
+                enabled = !downloading,
+                onClick = { dismissUpdate() }
+            ) {
+                Text("Later")
             }
         }
     )
@@ -186,7 +197,7 @@ private fun findAppUpdate(context: Context): AppRelease? {
             }
         }
         val validUrl = apkUrl ?: return null
-        AppRelease(remoteCode, tag.removePrefix("v"), validUrl, json.optString("body").trim())
+        AppRelease(remoteCode, tag.removePrefix("v"), validUrl)
     } catch (_: Exception) {
         null
     } finally {
