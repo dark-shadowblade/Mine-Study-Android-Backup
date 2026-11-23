@@ -2,11 +2,13 @@ package com.minstudy.app
 
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.provider.Settings
 import android.widget.Toast
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material3.AlertDialog
@@ -36,109 +38,155 @@ import java.io.File
 import java.net.HttpURLConnection
 import java.net.URL
 
-private data class AppRelease(val versionCode: Long, val versionName: String, val apkUrl: String, val notes: String)
+private data class AppRelease(
+    val versionCode: Long,
+    val versionName: String,
+    val apkUrl: String,
+    val notes: String
+)
 
 @Composable
 internal fun AutoUpdateChecker() {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    val preferences = remember {
+        context.getSharedPreferences("mine_study_updates", Context.MODE_PRIVATE)
+    }
     var release by remember { mutableStateOf<AppRelease?>(null) }
-    var checking by remember { mutableStateOf(true) }
     var downloading by remember { mutableStateOf(false) }
     var progress by remember { mutableFloatStateOf(0f) }
-    var error by remember { mutableStateOf("") }
     var downloadedApk by remember { mutableStateOf<File?>(null) }
 
     LaunchedEffect(Unit) {
-        checking = true
-        release = withContext(Dispatchers.IO) { findAppUpdate(context) }
-        checking = false
+        val latest = withContext(Dispatchers.IO) { findAppUpdate(context) }
+        if (latest != null &&
+            preferences.getLong("dismissed_version", -1L) != latest.versionCode
+        ) {
+            release = latest
+        }
     }
 
-    val available = release
-    if (available != null) {
-        AlertDialog(
-            onDismissRequest = { if (!downloading) release = null },
-            title = { Text("Update available") },
-            text = {
-                androidx.compose.foundation.layout.Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Text("Mine Study ${available.versionName} is ready to install.")
-                    if (available.notes.isNotBlank()) Text(available.notes, style = MaterialTheme.typography.bodySmall, maxLines = 5)
-                    if (downloading) {
-                        LinearProgressIndicator(progress = { progress }, modifier = Modifier.fillMaxWidth())
-                        Text("Downloading ${(progress * 100).toInt()}%")
-                    }
-                    if (error.isNotBlank()) Text(error, color = MaterialTheme.colorScheme.error)
+    val available = release ?: return
+
+    fun dismissUpdate() {
+        preferences.edit().putLong("dismissed_version", available.versionCode).apply()
+        release = null
+    }
+
+    AlertDialog(
+        onDismissRequest = { if (!downloading) dismissUpdate() },
+        title = { Text("Update available") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text("Mine Study ${available.versionName} is ready.")
+                if (available.notes.isNotBlank()) {
+                    Text(
+                        available.notes,
+                        style = MaterialTheme.typography.bodySmall,
+                        maxLines = 4
+                    )
                 }
-            },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        val existing = downloadedApk
-                        if (existing != null && existing.exists()) {
-                            installDownloadedUpdate(context, existing)
-                        } else if (!downloading) {
-                            downloading = true
-                            error = ""
-                            scope.launch {
-                                try {
-                                    downloadedApk = downloadUpdate(available.apkUrl, context) { progress = it }
-                                    progress = 1f
-                                } catch (e: Exception) {
-                                    error = e.message ?: "Download failed. Please try again."
-                                } finally {
-                                    downloading = false
-                                }
-                            }
-                        }
-                    },
-                    enabled = !downloading
-                ) {
-                    if (downloading) CircularProgressIndicator() else Text(if (downloadedApk?.exists() == true) "Install update" else "Update")
-                }
-            },
-            dismissButton = {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    if (downloadedApk?.exists() == true) {
-                        TextButton(onClick = { installDownloadedUpdate(context, downloadedApk!!) }) { Text("Install") }
-                    }
-                    TextButton(onClick = { if (!downloading) release = null }, enabled = !downloading) { Text("Later") }
+                if (downloading) {
+                    LinearProgressIndicator(
+                        progress = { progress },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Text("Downloading ${(progress * 100).toInt()}%")
                 }
             }
-        )
-    } else if (checking) {
-        // A silent, lightweight check; no blocking launch screen.
-    }
+        },
+        confirmButton = {
+            Button(
+                enabled = !downloading,
+                onClick = {
+                    val readyFile = downloadedApk?.takeIf { it.isFile && it.length() > 0L }
+                    if (readyFile != null) {
+                        installDownloadedUpdate(context, readyFile)
+                    } else {
+                        downloading = true
+                        progress = 0f
+                        scope.launch {
+                            try {
+                                downloadedApk = downloadUpdate(
+                                    available.apkUrl,
+                                    context,
+                                    available.versionCode
+                                ) { value ->
+                                    progress = value
+                                }
+                                progress = 1f
+                            } catch (_: Exception) {
+                                downloadedApk = null
+                                Toast.makeText(
+                                    context,
+                                    "Update download failed. Please try again.",
+                                    Toast.LENGTH_SHORT
+                                ).show()
+                            } finally {
+                                downloading = false
+                            }
+                        }
+                    }
+                }
+            ) {
+                if (downloading) {
+                    CircularProgressIndicator()
+                } else {
+                    Text(if (downloadedApk?.exists() == true) "Install update" else "Update")
+                }
+            }
+        },
+        dismissButton = {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                TextButton(
+                    enabled = !downloading,
+                    onClick = { dismissUpdate() }
+                ) { Text("Later") }
+            }
+        }
+    )
 }
 
 private fun findAppUpdate(context: Context): AppRelease? {
     var connection: HttpURLConnection? = null
     return try {
-        connection = (URL("https://api.github.com/repos/dark-shadowblade/Mine-Study-Android-Backup/releases/latest").openConnection() as HttpURLConnection).apply {
-            connectTimeout = 10000
-            readTimeout = 15000
+        connection = (URL(
+            "https://api.github.com/repos/dark-shadowblade/Mine-Study-Android-Backup/releases/latest"
+        ).openConnection() as HttpURLConnection).apply {
+            connectTimeout = 8000
+            readTimeout = 12000
             setRequestProperty("Accept", "application/vnd.github+json")
             setRequestProperty("User-Agent", "Mine-Study-Android")
         }
         if (connection.responseCode !in 200..299) return null
+
         val json = JSONObject(connection.inputStream.bufferedReader().use { it.readText() })
+        if (json.optBoolean("draft") || json.optBoolean("prerelease")) return null
+
         val tag = json.optString("tag_name")
-        val remoteCode = tag.removePrefix("v").substringAfterLast('.').toLongOrNull() ?: return null
+        val match = Regex("^v?\\d+\\.\\d+\\.(\\d+)$").matchEntire(tag) ?: return null
+        val remoteCode = match.groupValues[1].toLongOrNull() ?: return null
+
         val packageInfo = context.packageManager.getPackageInfo(context.packageName, 0)
         @Suppress("DEPRECATION")
-        val installedCode = if (Build.VERSION.SDK_INT >= 28) packageInfo.longVersionCode else packageInfo.versionCode.toLong()
+        val installedCode = if (Build.VERSION.SDK_INT >= 28) {
+            packageInfo.longVersionCode
+        } else {
+            packageInfo.versionCode.toLong()
+        }
         if (remoteCode <= installedCode) return null
+
         val assets = json.optJSONArray("assets") ?: return null
-        var apkUrl = ""
+        var apkUrl: String? = null
         for (i in 0 until assets.length()) {
             val asset = assets.optJSONObject(i) ?: continue
-            if (asset.optString("name").endsWith(".apk", true)) {
-                apkUrl = asset.optString("browser_download_url")
-                if (apkUrl.isNotBlank()) break
+            if (asset.optString("name") == "app-debug.apk") {
+                apkUrl = asset.optString("browser_download_url").takeIf { it.startsWith("https://") }
+                break
             }
         }
-        if (apkUrl.isBlank()) return null
-        AppRelease(remoteCode, tag.removePrefix("v"), apkUrl, json.optString("body").trim())
+        val validUrl = apkUrl ?: return null
+        AppRelease(remoteCode, tag.removePrefix("v"), validUrl, json.optString("body").trim())
     } catch (_: Exception) {
         null
     } finally {
@@ -146,37 +194,78 @@ private fun findAppUpdate(context: Context): AppRelease? {
     }
 }
 
-private suspend fun downloadUpdate(url: String, context: Context, onProgress: (Float) -> Unit): File = withContext(Dispatchers.IO) {
+private suspend fun downloadUpdate(
+    url: String,
+    context: Context,
+    expectedVersionCode: Long,
+    onProgress: (Float) -> Unit
+): File = withContext(Dispatchers.IO) {
     var connection: HttpURLConnection? = null
+    val directory = File(context.cacheDir, "updates").apply { mkdirs() }
+    val target = File(directory, "mine-study-update.apk")
+    val temporary = File(directory, "mine-study-update.apk.part")
     try {
+        temporary.delete()
         connection = (URL(url).openConnection() as HttpURLConnection).apply {
             connectTimeout = 15000
             readTimeout = 30000
             instanceFollowRedirects = true
             setRequestProperty("User-Agent", "Mine-Study-Android")
         }
-        if (connection.responseCode !in 200..299) throw IllegalStateException("Download failed (HTTP ${connection.responseCode})")
-        val total = connection.contentLengthLong
-        val dir = File(context.cacheDir, "updates").apply { mkdirs() }
-        val target = File(dir, "mine-study-update.apk")
-        val temp = File(dir, "mine-study-update.apk.part")
+        val response = connection.responseCode
+        if (response !in 200..299) {
+            throw IllegalStateException("HTTP $response")
+        }
+
+        val expectedLength = connection.contentLengthLong
+        var received = 0L
         connection.inputStream.use { input ->
-            temp.outputStream().buffered().use { output ->
+            temporary.outputStream().buffered().use { output ->
                 val buffer = ByteArray(64 * 1024)
-                var received = 0L
                 while (true) {
                     val count = input.read(buffer)
                     if (count < 0) break
                     output.write(buffer, 0, count)
                     received += count
-                    if (total > 0) onProgress((received.toFloat() / total).coerceIn(0f, 1f))
+                    if (expectedLength > 0L) {
+                        val value = (received.toFloat() / expectedLength).coerceIn(0f, 1f)
+                        withContext(Dispatchers.Main) { onProgress(value) }
+                    }
                 }
             }
         }
-        if (temp.length() < 1024L) throw IllegalStateException("Downloaded APK is incomplete")
-        if (target.exists()) target.delete()
-        if (!temp.renameTo(target)) throw IllegalStateException("Could not save the update APK")
+
+        if (received < 1024L || (expectedLength > 0L && received != expectedLength)) {
+            throw IllegalStateException("Incomplete APK")
+        }
+
+        @Suppress("DEPRECATION")
+        val archiveInfo = context.packageManager.getPackageArchiveInfo(
+            temporary.absolutePath,
+            PackageManager.GET_ACTIVITIES
+        ) ?: throw IllegalStateException("Invalid APK")
+        @Suppress("DEPRECATION")
+        val archiveVersion = if (Build.VERSION.SDK_INT >= 28) {
+            archiveInfo.longVersionCode
+        } else {
+            archiveInfo.versionCode.toLong()
+        }
+        if (archiveInfo.packageName != context.packageName ||
+            archiveVersion != expectedVersionCode
+        ) {
+            throw IllegalStateException("APK does not match this update")
+        }
+
+        if (target.exists() && !target.delete()) {
+            throw IllegalStateException("Could not replace cached APK")
+        }
+        if (!temporary.renameTo(target)) {
+            throw IllegalStateException("Could not save APK")
+        }
         target
+    } catch (error: Exception) {
+        temporary.delete()
+        throw error
     } finally {
         connection?.disconnect()
     }
@@ -184,18 +273,36 @@ private suspend fun downloadUpdate(url: String, context: Context, onProgress: (F
 
 private fun installDownloadedUpdate(context: Context, apk: File) {
     if (Build.VERSION.SDK_INT >= 26 && !context.packageManager.canRequestPackageInstalls()) {
-        Toast.makeText(context, "Allow Mine Study to install updates, then return and tap Install.", Toast.LENGTH_LONG).show()
-        context.startActivity(Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:${context.packageName}")).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+        Toast.makeText(
+            context,
+            "Allow installs for Mine Study, then return and tap Install.",
+            Toast.LENGTH_LONG
+        ).show()
+        context.startActivity(
+            Intent(
+                Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
+                Uri.parse("package:${context.packageName}")
+            ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        )
         return
     }
+
     try {
-        val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", apk)
+        val uri = FileProvider.getUriForFile(
+            context,
+            "${context.packageName}.fileprovider",
+            apk
+        )
         val intent = Intent(Intent.ACTION_VIEW).apply {
             setDataAndType(uri, "application/vnd.android.package-archive")
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
         }
         context.startActivity(intent)
-    } catch (e: Exception) {
-        Toast.makeText(context, "Could not start installer: ${e.message ?: "unknown error"}", Toast.LENGTH_LONG).show()
+    } catch (_: Exception) {
+        Toast.makeText(
+            context,
+            "Could not open the Android installer.",
+            Toast.LENGTH_SHORT
+        ).show()
     }
 }
