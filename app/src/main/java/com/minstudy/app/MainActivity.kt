@@ -20,7 +20,14 @@ import android.view.ViewGroup
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.gestures.detectDragGestures
@@ -1110,8 +1117,16 @@ private fun MineStudyApp() {
             },
             containerColor = Color(0xFF0B0D14)
         ) { padding ->
-            Column(Modifier.fillMaxSize().padding(padding).padding(horizontal = if (screen == "player") 0.dp else 18.dp)) {
-                when (screen) {
+            Column(Modifier.fillMaxSize().padding(padding).padding(horizontal = if (screen == "player") 0.dp else 16.dp)) {
+                AnimatedContent(
+                    targetState = screen,
+                    transitionSpec = {
+                        (fadeIn(tween(170)) + slideInHorizontally(tween(170)) { it / 24 }) togetherWith
+                            (fadeOut(tween(100)) + slideOutHorizontally(tween(100)) { -it / 32 })
+                    },
+                    label = "screen-transition"
+                ) { activeScreen ->
+                when (activeScreen) {
                     "home" -> {
                         if (apiKey.isBlank()) {
                             Card(
@@ -1632,6 +1647,7 @@ private fun MineStudyApp() {
                     Spacer(Modifier.height(8.dp))
                     Text(error, color = Color(0xFFFF8A8A), style = MaterialTheme.typography.bodySmall)
                 }
+                }
             }
         }
     }
@@ -1771,6 +1787,19 @@ private fun ItemList(
         }
         if (showSubjectStars) filtered.sortedByDescending { it.id in starredSubjectIds } else filtered
     }
+    // Index download state once per update instead of scanning the full list per row.
+    val downloadedKeys = remember(downloadRecords, downloadCategory) {
+        downloadRecords.asSequence().filter { it.category == downloadCategory && it.itemKey.isNotBlank() }
+            .map { it.itemKey }.toSet()
+    }
+    val downloadedNames = remember(downloadRecords, downloadCategory) {
+        downloadRecords.asSequence().filter { it.category == downloadCategory && it.itemKey.isBlank() }
+            .map { it.name.substringBeforeLast('.').lowercase() }.toSet()
+    }
+    val queueByKey = remember(downloadQueueItems, downloadCategory) {
+        downloadQueueItems.asSequence().filter { it.category == downloadCategory && it.itemKey.isNotBlank() }
+            .associateBy { it.itemKey }
+    }
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(heading, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
         if (searchable) {
@@ -1824,15 +1853,12 @@ private fun ItemList(
                 verticalArrangement = Arrangement.spacedBy(8.dp),
                 contentPadding = PaddingValues(bottom = 20.dp)
             ) {
-                items(visibleItems, key = { it.id }) { item ->
+                items(visibleItems, key = { it.id }, contentType = { if (showThumbnails) "lecture-row" else "study-row" }) { item ->
                     val thumbnail = item.raw.optString("image").takeIf { showThumbnails && it.startsWith("http", true) }
                     val cleanTitle = item.title.replace(Regex("[\\\\/:*?\\\"<>|]"), "_").trim()
                     val itemKey = downloadItemKey(item)
-                    val downloaded = downloadRecords.any { record ->
-                        record.category == downloadCategory && (record.itemKey == itemKey ||
-                            (record.itemKey.isBlank() && record.name.substringBeforeLast('.').equals(cleanTitle, ignoreCase = true)))
-                    }
-                    val queueEntry = downloadQueueItems.firstOrNull { it.itemKey == itemKey && it.category == downloadCategory }
+                    val downloaded = itemKey in downloadedKeys || cleanTitle.lowercase() in downloadedNames
+                    val queueEntry = queueByKey[itemKey]
                     val downloading = itemKey in downloadingKeys || (activeDownloadKey == itemKey && activeDownloadCategory == downloadCategory)
                     val itemPercent = queueEntry?.takeIf { it.total > 0L }?.let {
                         ((it.bytes * 100L) / it.total).toInt().coerceIn(0, 99)
