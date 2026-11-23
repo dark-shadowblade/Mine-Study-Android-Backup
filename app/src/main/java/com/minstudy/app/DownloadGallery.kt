@@ -604,7 +604,10 @@ fun DownloadCenterScreen(
                                 if (item.active && item.total > 0L) {
                                     androidx.compose.material3.LinearProgressIndicator(progress = (item.bytes.toFloat() / item.total.toFloat()).coerceIn(0f, 1f), modifier = Modifier.fillMaxWidth())
                                     androidx.compose.material3.Text("${(item.bytes * 100L / item.total).toInt()}% · ${formatDownloadBytes(item.bytes)} / ${formatDownloadBytes(item.total)} · ${formatDownloadSpeed(item.speed)}", style = androidx.compose.material3.MaterialTheme.typography.labelSmall, color = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant)
-                                } else if (item.active) androidx.compose.material3.LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                                } else if (item.active) {
+                                    androidx.compose.material3.LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                                    androidx.compose.material3.Text("${formatDownloadBytes(item.bytes)} · ${formatDownloadSpeed(item.speed)}", style = androidx.compose.material3.MaterialTheme.typography.labelSmall, color = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
                             }
                             if (item.active) {
                                 androidx.compose.material3.IconButton(onClick = { if (item.paused) onResume(item.id) else onPause(item.id) }, modifier = Modifier.size(34.dp)) {
