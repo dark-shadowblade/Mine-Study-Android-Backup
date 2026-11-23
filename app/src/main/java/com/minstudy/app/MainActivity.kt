@@ -1119,6 +1119,7 @@ private fun MineStudyApp() {
         ) { padding ->
             Column(Modifier.fillMaxSize().padding(padding).padding(horizontal = if (screen == "player") 0.dp else 16.dp)) {
                 AnimatedContent(
+                    modifier = Modifier.fillMaxSize(),
                     targetState = screen,
                     transitionSpec = {
                         (fadeIn(tween(170)) + slideInHorizontally(tween(170)) { it / 24 }) togetherWith
@@ -2143,7 +2144,7 @@ private fun VideoScreen(
     DisposableEffect(fullScreen) {
         val window = activity?.window
         if (fullScreen) {
-            activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR
+            activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_PORTRAIT
             if (window != null) WindowInsetsControllerCompat(window, window.decorView).hide(WindowInsetsCompat.Type.systemBars())
         } else {
             activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
