@@ -1344,7 +1344,6 @@ private fun MineStudyApp() {
                             }
                         )
                         Spacer(Modifier.height(8.dp))
-                        if (batchSearchError.isNotBlank()) Text(batchSearchError, color = Color(0xFFB8C1D1), style = MaterialTheme.typography.bodySmall)
                         if (batchSearchLoading) LinearProgressIndicator(Modifier.fillMaxWidth())
                         LazyColumn(state = batchListState, verticalArrangement = Arrangement.spacedBy(8.dp), contentPadding = PaddingValues(bottom = 12.dp)) {
                             items(batchSearchResults, key = { it.id }) { info ->
@@ -1422,7 +1421,6 @@ private fun MineStudyApp() {
                             }
                         )
                         Text("Use this if a batch isn't listed in All batches.", color = Color.Gray, style = MaterialTheme.typography.bodySmall)
-                        if (batchSearchError.isNotBlank()) Text(batchSearchError, color = Color(0xFFFF8A8A), style = MaterialTheme.typography.bodySmall)
                         Spacer(Modifier.height(10.dp))
                         LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp), contentPadding = PaddingValues(bottom = 16.dp)) {
                             items(savedBatchIds.sorted(), key = { it }) { id ->
@@ -1643,10 +1641,6 @@ private fun MineStudyApp() {
                     }
                 }
                 if (busy) LinearProgressIndicator(Modifier.fillMaxWidth().padding(top = 8.dp))
-                if (error.isNotBlank()) {
-                    Spacer(Modifier.height(8.dp))
-                    Text(error, color = Color(0xFFFF8A8A), style = MaterialTheme.typography.bodySmall)
-                }
                 }
             }
         }
