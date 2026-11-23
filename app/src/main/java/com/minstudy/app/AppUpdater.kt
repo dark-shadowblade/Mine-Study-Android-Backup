@@ -125,11 +125,11 @@ internal fun AutoUpdateChecker() {
                                 progress = 1f
                             } catch (_: Exception) {
                                 downloadedApk = null
-                                Toast.makeText(
-                                    context,
-                                    "Update failed",
-                                    Toast.LENGTH_SHORT
-                                ).show()
+                                val message = if (
+                                    error.message?.contains("signing certificate") == true
+                                ) "This update can't replace the installed app."
+                                else "Update failed"
+                                Toast.makeText(context, message, Toast.LENGTH_LONG).show()
                             } finally {
                                 downloading = false
                             }
@@ -254,7 +254,9 @@ private suspend fun downloadUpdate(
         @Suppress("DEPRECATION")
         val archiveInfo = context.packageManager.getPackageArchiveInfo(
             temporary.absolutePath,
-            PackageManager.GET_ACTIVITIES
+            PackageManager.GET_ACTIVITIES or
+                if (Build.VERSION.SDK_INT >= 28) PackageManager.GET_SIGNING_CERTIFICATES
+                else @Suppress("DEPRECATION") PackageManager.GET_SIGNATURES
         ) ?: throw IllegalStateException("Invalid APK")
         @Suppress("DEPRECATION")
         val archiveVersion = if (Build.VERSION.SDK_INT >= 28) {
@@ -266,6 +268,29 @@ private suspend fun downloadUpdate(
             archiveVersion != expectedVersionCode
         ) {
             throw IllegalStateException("APK does not match this update")
+        }
+
+        val installedInfo = context.packageManager.getPackageInfo(
+            context.packageName,
+            if (Build.VERSION.SDK_INT >= 28) PackageManager.GET_SIGNING_CERTIFICATES
+            else @Suppress("DEPRECATION") PackageManager.GET_SIGNATURES
+        )
+        val installedSigners = if (Build.VERSION.SDK_INT >= 28) {
+            installedInfo.signingInfo?.apkContentsSigners?.map { it.toCharsString() }?.toSet()
+        } else {
+            @Suppress("DEPRECATION")
+            installedInfo.signatures?.map { it.toCharsString() }?.toSet()
+        }
+        val updateSigners = if (Build.VERSION.SDK_INT >= 28) {
+            archiveInfo.signingInfo?.apkContentsSigners?.map { it.toCharsString() }?.toSet()
+        } else {
+            @Suppress("DEPRECATION")
+            archiveInfo.signatures?.map { it.toCharsString() }?.toSet()
+        }
+        if (installedSigners.isNullOrEmpty() || updateSigners.isNullOrEmpty() ||
+            installedSigners != updateSigners
+        ) {
+            throw IllegalStateException("Update signing certificate does not match installed app")
         }
 
         if (target.exists() && !target.delete()) {
@@ -305,9 +330,10 @@ private fun installDownloadedUpdate(context: Context, apk: File) {
             "${context.packageName}.fileprovider",
             apk
         )
-        val intent = Intent(Intent.ACTION_VIEW).apply {
-            setDataAndType(uri, "application/vnd.android.package-archive")
+        val intent = Intent(Intent.ACTION_INSTALL_PACKAGE).apply {
+            setData(uri)
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
+            putExtra(Intent.EXTRA_RETURN_RESULT, true)
         }
         context.startActivity(intent)
     } catch (_: Exception) {
