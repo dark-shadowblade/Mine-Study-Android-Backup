@@ -26,6 +26,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.dp
 import androidx.core.content.FileProvider
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -60,7 +61,7 @@ internal fun AutoUpdateChecker() {
             onDismissRequest = { if (!downloading) release = null },
             title = { Text("Update available") },
             text = {
-                androidx.compose.foundation.layout.Column(verticalArrangement = Arrangement.spacedBy(androidx.compose.ui.unit.dp(10))) {
+                androidx.compose.foundation.layout.Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Text("Mine Study ${available.versionName} is ready to install.")
                     if (available.notes.isNotBlank()) Text(available.notes, style = MaterialTheme.typography.bodySmall, maxLines = 5)
                     if (downloading) {
@@ -97,7 +98,7 @@ internal fun AutoUpdateChecker() {
                 }
             },
             dismissButton = {
-                Row(horizontalArrangement = Arrangement.spacedBy(androidx.compose.ui.unit.dp(8))) {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     if (downloadedApk?.exists() == true) {
                         TextButton(onClick = { installDownloadedUpdate(context, downloadedApk!!) }) { Text("Install") }
                     }
@@ -124,7 +125,7 @@ private fun findAppUpdate(context: Context): AppRelease? {
         val tag = json.optString("tag_name")
         val remoteCode = tag.removePrefix("v").substringAfterLast('.').toLongOrNull() ?: return null
         val packageInfo = context.packageManager.getPackageInfo(context.packageName, 0)
-        val installedCode = if (Build.VERSION.SDK_INT >= 28) packageInfo.longVersionCode else @Suppress("DEPRECATION") packageInfo.versionCode.toLong()
+        @Suppress("DEPRECATION")\n        val installedCode = if (Build.VERSION.SDK_INT >= 28) packageInfo.longVersionCode else packageInfo.versionCode.toLong()
         if (remoteCode <= installedCode) return null
         val assets = json.optJSONArray("assets") ?: return null
         var apkUrl = ""
