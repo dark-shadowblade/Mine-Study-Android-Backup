@@ -488,6 +488,12 @@ fun PdfViewerScreen(uri: Uri, title: String, onBack: () -> Unit) {
     }
 }
 
+private fun formatDownloadSpeed(bytesPerSecond: Long): String {
+    if (bytesPerSecond <= 0L) return "— MB/s"
+    val mb = bytesPerSecond / (1024.0 * 1024.0)
+    return if (mb >= 1.0) String.format(java.util.Locale.US, "%.2f MB/s", mb)
+    else String.format(java.util.Locale.US, "%.0f KB/s", bytesPerSecond / 1024.0)
+}
 
 private fun formatDownloadBytes(bytes: Long): String {
     if (bytes < 1024L) return "$bytes B"
@@ -597,7 +603,7 @@ fun DownloadCenterScreen(
                                 androidx.compose.material3.Text(if (item.paused) "Paused · slot released" else if (item.active) "Downloading · ${item.category}" else "Queued · ${item.category}", style = androidx.compose.material3.MaterialTheme.typography.labelSmall, color = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant)
                                 if (item.active && item.total > 0L) {
                                     androidx.compose.material3.LinearProgressIndicator(progress = (item.bytes.toFloat() / item.total.toFloat()).coerceIn(0f, 1f), modifier = Modifier.fillMaxWidth())
-                                    androidx.compose.material3.Text("${(item.bytes * 100L / item.total).toInt()}% · ${formatDownloadBytes(item.bytes)} / ${formatDownloadBytes(item.total)}", style = androidx.compose.material3.MaterialTheme.typography.labelSmall, color = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant)
+                                    androidx.compose.material3.Text("${(item.bytes * 100L / item.total).toInt()}% · ${formatDownloadBytes(item.bytes)} / ${formatDownloadBytes(item.total)} · ${formatDownloadSpeed(item.speed)}", style = androidx.compose.material3.MaterialTheme.typography.labelSmall, color = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant)
                                 } else if (item.active) androidx.compose.material3.LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
                             }
                             if (item.active) {

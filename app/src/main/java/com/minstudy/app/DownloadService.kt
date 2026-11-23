@@ -23,7 +23,7 @@ import kotlinx.coroutines.launch
 import java.util.ArrayDeque
 import kotlin.math.max
 
-data class DownloadQueueEntry(val id: String, val title: String, val category: String, val active: Boolean, val paused: Boolean, val itemKey: String = "", val bytes: Long = 0L, val total: Long = -1L)
+data class DownloadQueueEntry(val id: String, val title: String, val category: String, val active: Boolean, val paused: Boolean, val itemKey: String = "", val bytes: Long = 0L, val total: Long = -1L, val speed: Long = 0L)
 
 data class DownloadUiState(
     val status: String = "",
@@ -251,28 +251,28 @@ class DownloadService : Service() {
 
     private suspend fun runTask(id: String, task: Task, taskControl: DownloadControl) {
         currentTitle = task.title
-        lastProgressAt = System.currentTimeMillis()
-        lastProgressBytes = 0L
+        var taskProgressAt = System.currentTimeMillis()
+        var taskProgressBytes = 0L
         refreshQueueState("Downloading • ${task.title}")
         try {
             val record = DownloadRepository.download(
                 this@DownloadService, task.url, task.title, task.category, task.video, task.itemKey, taskControl
             ) { bytes, total ->
                 val now = System.currentTimeMillis()
-                val elapsed = (now - lastProgressAt).coerceAtLeast(1L)
-                val speed = if (elapsed >= 700L) ((bytes - lastProgressBytes) * 1000L / elapsed).coerceAtLeast(0L) else mutableState.value.speed
+                val elapsed = (now - taskProgressAt).coerceAtLeast(1L)
+                val taskSpeed = if (elapsed >= 700L) ((bytes - taskProgressBytes).coerceAtLeast(0L) * 1000L / elapsed) else 0L
                 // Parallel workers report progress concurrently; update atomically
                 // so one worker cannot overwrite another worker's queue row.
                 mutableState.update { state ->
                     val updatedQueue = state.queueItems.map { entry ->
-                        if (entry.id == id) entry.copy(bytes = bytes, total = total) else entry
+                        if (entry.id == id) entry.copy(bytes = bytes, total = total, speed = if (taskControl.paused) 0L else taskSpeed) else entry
                     }
                     state.copy(
                         status = "Downloading • ${task.title}",
                         active = true,
                         bytes = bytes,
                         total = total,
-                        speed = speed,
+                        speed = updatedQueue.filter { it.active && !it.paused }.sumOf { it.speed },
                         title = task.title,
                         category = task.category,
                         itemKey = task.itemKey,
@@ -285,8 +285,8 @@ class DownloadService : Service() {
                     notifyItem(task, bytes, total, taskControl.paused)
                 }
                 if (elapsed >= 700L) {
-                    lastProgressAt = now
-                    lastProgressBytes = bytes
+                    taskProgressAt = now
+                    taskProgressBytes = bytes
                     updateNotification()
                 }
             }
@@ -328,7 +328,7 @@ class DownloadService : Service() {
         val previous = previousItems.associateBy { it.id }
         return active.map { (id, pair) ->
             val progress = previous[id]
-            DownloadQueueEntry(id, pair.first.title, pair.first.category, true, pair.second.paused, pair.first.itemKey, progress?.bytes ?: 0L, progress?.total ?: -1L)
+            DownloadQueueEntry(id, pair.first.title, pair.first.category, true, pair.second.paused, pair.first.itemKey, progress?.bytes ?: 0L, progress?.total ?: -1L, progress?.speed ?: 0L)
         } + pending.map { task -> DownloadQueueEntry(task.id, task.title, task.category, false, false, task.itemKey) }
     }
 
