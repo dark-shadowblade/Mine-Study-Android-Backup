@@ -2193,6 +2193,7 @@ private fun VideoScreen(
     var showResources by remember { mutableStateOf(false) }
     var showControls by remember { mutableStateOf(true) }
     var controlsLocked by remember { mutableStateOf(false) }
+    var showUnlockButton by remember { mutableStateOf(false) }
     var speedMenu by remember { mutableStateOf(false) }
     var speedDialog by remember { mutableStateOf(false) }
     var speedText by remember { mutableStateOf("1.25") }
@@ -2314,6 +2315,13 @@ private fun VideoScreen(
         }
     }
 
+    LaunchedEffect(controlsLocked, showUnlockButton) {
+        if (controlsLocked && showUnlockButton) {
+            delay(2500)
+            showUnlockButton = false
+        }
+    }
+
     LaunchedEffect(showControls, speedMenu, speedDialog, isScrubbing, fullScreen, buffering) {
         if (showControls && !buffering && !speedMenu && !speedDialog && !isScrubbing && !controlsLocked) {
             delay(4500)
@@ -2426,7 +2434,9 @@ private fun VideoScreen(
                     }
                 }
                 SpeedPicker()
-                IconButton(onClick = {                    controlsLocked = true
+                IconButton(onClick = {
+                    controlsLocked = true
+                    showUnlockButton = false
                     showControls = false
                 }, modifier = Modifier.size(38.dp)) {
                     Icon(Icons.Default.Lock, "Lock controls", tint = Color.White)
@@ -2517,10 +2527,17 @@ private fun VideoScreen(
                         },
                         modifier = Modifier.size(32.dp)
                     ) {
-                        Icon(
-                            when { volume == 0 -> Icons.Default.VolumeMute; volume < maxVolume / 2 -> Icons.Default.VolumeDown; else -> Icons.Default.VolumeUp },
-                            if (volume == 0) "Unmute" else "Mute", tint = Color.White, modifier = Modifier.size(19.dp)
-                        )
+                        Box(Modifier.size(19.dp), contentAlignment = Alignment.Center) {
+                            Icon(
+                                when { volume == 0 -> Icons.Default.VolumeMute; volume < maxVolume / 2 -> Icons.Default.VolumeDown; else -> Icons.Default.VolumeUp },
+                                if (volume == 0) "Unmute" else "Mute", tint = Color.White, modifier = Modifier.fillMaxSize()
+                            )
+                            if (volume == 0) {
+                                Canvas(Modifier.fillMaxSize()) {
+                                    drawLine(Color.White, Offset(size.width * 0.12f, size.height * 0.12f), Offset(size.width * 0.88f, size.height * 0.88f), 2.2.dp.toPx(), cap = StrokeCap.Round)
+                                }
+                            }
+                        }
                     }
                     if (volumePanel) {
                         Canvas(
@@ -2670,7 +2687,10 @@ private fun VideoScreen(
                             )
                         }.pointerInput(player, controlsLocked) {
             detectTapGestures(
-                onTap = { if (!controlsLocked) showControls = !showControls },
+                onTap = {
+                    if (controlsLocked) showUnlockButton = true
+                    else showControls = !showControls
+                },
                 onDoubleTap = { offset ->
                     if (!controlsLocked) {
                         val delta = if (offset.x < size.width / 2f) -10_000L else 10_000L
@@ -2706,18 +2726,11 @@ private fun VideoScreen(
                     Text(gestureValue, color = Color.White, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                 }
             }
-            if (controlsLocked) {
-                Column(
-                    modifier = Modifier.align(Alignment.Center)
-                        .background(Color(0xAA000000), RoundedCornerShape(18.dp))
-                        .clickable { controlsLocked = false; showControls = true }
-                        .padding(horizontal = 16.dp, vertical = 10.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
+            if (controlsLocked && showUnlockButton) {
+                IconButton(onClick = { controlsLocked = false; showUnlockButton = false; showControls = true }, modifier = Modifier.align(Alignment.Center).size(52.dp).background(Color(0xAA000000), RoundedCornerShape(50))) {
                     Icon(Icons.Default.LockOpen, contentDescription = "Unlock controls", tint = Color.White)
-                    Text("Unlock", color = Color.White, style = MaterialTheme.typography.labelMedium)
                 }
-            } else if (showControls) PlayerOverlay(landscape = true, fullScreenMode = true)
+            } else if (!controlsLocked && showControls) PlayerOverlay(landscape = true, fullScreenMode = true)
             if (showResources) {
                 Box(Modifier.fillMaxSize().background(Color(0x99000000)).clickable { showResources = false }) {
                     Card(
@@ -2812,7 +2825,10 @@ private fun VideoScreen(
                                     )
                                 }.pointerInput(player, controlsLocked) {
                         detectTapGestures(
-                            onTap = { if (!controlsLocked) showControls = !showControls },
+                            onTap = {
+                    if (controlsLocked) showUnlockButton = true
+                    else showControls = !showControls
+                },
                             onDoubleTap = { offset ->
                                 if (!controlsLocked) {
                                     val delta = if (offset.x < size.width / 2f) -10_000L else 10_000L
@@ -2849,18 +2865,11 @@ private fun VideoScreen(
                     Text(gestureValue, color = Color.White, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                 }
             }
-            if (controlsLocked) {
-                Column(
-                    modifier = Modifier.align(Alignment.Center)
-                        .background(Color(0xAA000000), RoundedCornerShape(18.dp))
-                        .clickable { controlsLocked = false; showControls = true }
-                        .padding(horizontal = 14.dp, vertical = 8.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
+            if (controlsLocked && showUnlockButton) {
+                IconButton(onClick = { controlsLocked = false; showUnlockButton = false; showControls = true }, modifier = Modifier.align(Alignment.Center).size(48.dp).background(Color(0xAA000000), RoundedCornerShape(50))) {
                     Icon(Icons.Default.LockOpen, contentDescription = "Unlock controls", tint = Color.White)
-                    Text("Unlock", color = Color.White, style = MaterialTheme.typography.labelSmall)
                 }
-            } else if (showControls) PlayerOverlay(landscape = false)
+            } else if (!controlsLocked && showControls) PlayerOverlay(landscape = false)
                 if (playerError.isNotBlank()) {
                     TextButton(onClick = { playerError = ""; player.prepare(); player.play() }, modifier = Modifier.align(Alignment.TopEnd)) {
                         Text("Retry", color = Color.White)
