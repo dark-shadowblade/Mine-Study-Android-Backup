@@ -1087,36 +1087,48 @@ private fun MineStudyApp() {
             },
             bottomBar = {
                 if (screen in setOf("home", "all_batches", "my_batches", "downloads", "settings")) {
-                    NavigationBar(containerColor = Color(0xFF111622)) {
+                    NavigationBar(
+                        containerColor = Color(0xFF111622),
+                        tonalElevation = 0.dp,
+                        windowInsets = NavigationBarDefaults.windowInsets
+                    ) {
                         NavigationBarItem(
+                            alwaysShowLabel = true,
+                            colors = NavigationBarItemDefaults.colors(
+                                selectedIconColor = Color(0xFFD8D0FF),
+                                selectedTextColor = Color(0xFFE8E5F2),
+                                indicatorColor = Color(0xFF302B46),
+                                unselectedIconColor = Color(0xFF858DA0),
+                                unselectedTextColor = Color(0xFF9AA5BA)
+                            ),
                             selected = screen == "home",
                             onClick = { screen = "home"; if (subjects.isEmpty() && apiKey.isNotBlank()) loadSubjects() },
                             icon = { Icon(Icons.Default.MenuBook, contentDescription = null) },
-                            label = { Text("Study") }
+                            label = { Text("Study", maxLines = 1, fontSize = 10.sp) }
                         )
                         NavigationBarItem(
                             selected = screen == "all_batches",
                             onClick = { screen = "all_batches" },
                             icon = { Icon(Icons.Default.Search, contentDescription = null) },
-                            label = { Text("All batches") }
+                            label = { Text("All batches", maxLines = 1, fontSize = 10.sp) }
                         )
                         NavigationBarItem(
                             selected = screen == "my_batches",
                             onClick = { screen = "my_batches" },
                             icon = { Icon(Icons.Default.FolderOpen, contentDescription = null) },
-                            label = { Text("My batches") }
+                            label = { Text("My batches", maxLines = 1, fontSize = 10.sp) }
                         )
                         NavigationBarItem(
                             selected = screen == "downloads",
                             onClick = { downloadRecords = DownloadRepository.list(context); screen = "downloads" },
                             icon = { Icon(Icons.Default.Download, contentDescription = null) },
-                            label = { Text("Gallery") }
+                            label = { Text("Gallery", maxLines = 1, fontSize = 10.sp) }
                         )
                         NavigationBarItem(
                             selected = screen == "settings",
                             onClick = { screen = "settings" },
                             icon = { Icon(Icons.Default.Settings, contentDescription = null) },
-                            label = { Text("Settings") }
+                            label = { Text("Settings", maxLines = 1, fontSize = 10.sp) }
                         )
                     }
                 }
