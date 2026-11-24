@@ -41,7 +41,11 @@ jobs:
           APKSIGNER="$(find "$SDK_DIR/build-tools" -name apksigner -type f | sort -V | tail -n 1)"
           APK="app/build/outputs/apk/debug/app-debug.apk"
           EXPECTED_CERT="0d927c1457f4f691cbc0ce35aa5882fca1fee1e06534c1a5b3f41f85021c2d81"
-          ACTUAL_CERT="$("$APKSIGNER" verify --print-certs "$APK" | awk -F': ' '/Signer #1 certificate SHA-256 digest/ {print $2; exit}')"
+          ACTUAL_CERT="$("$APKSIGNER" verify --print-certs "$APK" 2>&1 | grep -Eio '[0-9a-f]{64}' | head -n 1 | tr '[:upper:]' '[:lower:]' || true)"
+          if [ -z "$ACTUAL_CERT" ]; then
+            echo "::error::Could not read the APK signing certificate."
+            exit 1
+          fi
           echo "Expected signing certificate: $EXPECTED_CERT"
           echo "Built APK certificate:       $ACTUAL_CERT"
           if [ "$ACTUAL_CERT" != "$EXPECTED_CERT" ]; then
