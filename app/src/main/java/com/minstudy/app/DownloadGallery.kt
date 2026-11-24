@@ -244,7 +244,7 @@ fun DownloadGallery(
             verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
         ) {
             androidx.compose.foundation.layout.Column(Modifier.weight(1f)) {
-                androidx.compose.material3.Text("Download Manager", style = androidx.compose.material3.MaterialTheme.typography.titleLarge, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold)
+                androidx.compose.material3.Text("Downloader", style = androidx.compose.material3.MaterialTheme.typography.titleLarge, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold)
                 androidx.compose.material3.Text(
                     "${records.size} files  •  ${formatDownloadBytes(totalStored)} used",
                     color = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant,
