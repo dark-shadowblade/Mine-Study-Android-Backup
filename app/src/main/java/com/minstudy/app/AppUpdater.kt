@@ -54,6 +54,19 @@ private data class AppRelease(
     val apkUrl: String
 )
 
+
+private object UpdateSettingsState {
+    val scope = kotlinx.coroutines.CoroutineScope(
+        kotlinx.coroutines.SupervisorJob() + Dispatchers.Main.immediate
+    )
+    val checking = mutableStateOf(false)
+    val downloading = mutableStateOf(false)
+    val progress = mutableFloatStateOf(0f)
+    val latest = mutableStateOf<AppRelease?>(null)
+    val apk = mutableStateOf<File?>(null)
+    val status = mutableStateOf("Checking for updates…")
+}
+
 @Composable
 internal fun AutoUpdateChecker(onUpdateAvailable: (Long) -> Unit = {}) {
     val context = LocalContext.current
@@ -347,17 +360,17 @@ internal fun UpdateSettingsScreen(
     onGenerateApiKey: () -> Unit
 ) {
     val context = LocalContext.current
-    val scope = rememberCoroutineScope()
     val installedVersion = remember {
         runCatching { context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: "Unknown" }
             .getOrDefault("Unknown")
     }
-    var checking by remember { mutableStateOf(false) }
-    var downloading by remember { mutableStateOf(false) }
-    var progress by remember { mutableFloatStateOf(0f) }
-    var latest by remember { mutableStateOf<AppRelease?>(null) }
-    var apk by remember { mutableStateOf<File?>(null) }
-    var status by remember { mutableStateOf("Check for updates to see if a new version is available.") }
+
+    var checking by UpdateSettingsState.checking
+    var downloading by UpdateSettingsState.downloading
+    var progress by UpdateSettingsState.progress
+    var latest by UpdateSettingsState.latest
+    var apk by UpdateSettingsState.apk
+    var status by UpdateSettingsState.status
 
     val verifying = keyStatus.contains("verifying", ignoreCase = true) ||
         keyStatus.contains("checking", ignoreCase = true) ||
@@ -368,9 +381,58 @@ internal fun UpdateSettingsScreen(
         keyStatus.contains("could not", ignoreCase = true) ||
         keyStatus.contains("error", ignoreCase = true)
 
+    fun checkForUpdates() {
+        if (checking || downloading) return
+        checking = true
+        latest = null
+        apk = null
+        status = "Checking for updates…"
+        UpdateSettingsState.scope.launch {
+            try {
+                val result = withContext(Dispatchers.IO) { findAppUpdate(context) }
+                latest = result
+                status = if (result == null) "You're using the latest version."
+                    else "Update available: v${result.versionName}"
+            } catch (_: Exception) {
+                status = "Couldn't check for updates. Try again."
+            } finally {
+                checking = false
+            }
+        }
+    }
+
+    fun downloadAvailableUpdate() {
+        val release = latest ?: return
+        if (downloading) return
+        downloading = true
+        progress = 0f
+        status = "Downloading v${release.versionName}…"
+        UpdateSettingsState.scope.launch {
+            try {
+                apk = downloadUpdate(release.apkUrl, context, release.versionCode) { value ->
+                    progress = value
+                }
+                progress = 1f
+                status = "Update ready to install."
+            } catch (_: Exception) {
+                apk = null
+                status = "Download failed. Tap to try again."
+            } finally {
+                downloading = false
+            }
+        }
+    }
+
+    LaunchedEffect(Unit) {
+        // Check automatically when Settings is first opened. The shared state and
+        // application-level scope survive navigation away from this screen.
+        if (latest == null && !checking && !downloading) checkForUpdates()
+        else if (apk?.isFile == true) status = "Update ready to install."
+    }
+
     Column(
         modifier = Modifier.fillMaxSize().padding(top = 8.dp),
-        verticalArrangement = Arrangement.spacedBy(9.dp)
+        verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         Text(
             "API-KEY",
@@ -424,71 +486,47 @@ internal fun UpdateSettingsScreen(
         ) {
             Text("NO KEY? Generate", style = MaterialTheme.typography.labelLarge)
         }
+        Text(
+            "App version  ·  v$installedVersion",
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
 
-        androidx.compose.foundation.layout.Spacer(Modifier.weight(1f))
-        Text(status, style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant)
-        if (checking || downloading) {
+        Text(
+            status,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        if (downloading) {
             LinearProgressIndicator(
-                progress = { if (downloading) progress else 0f },
+                progress = { progress },
                 modifier = Modifier.fillMaxWidth()
             )
-            if (downloading) Text("${(progress * 100).toInt()}%")
+            Text("${(progress * 100).toInt()}%", style = MaterialTheme.typography.labelSmall)
         }
+
         Button(
             enabled = !checking && !downloading,
             onClick = {
-                checking = true
-                latest = null
-                apk = null
-                status = "Checking for updates…"
-                scope.launch {
-                    val result = withContext(Dispatchers.IO) { findAppUpdate(context) }
-                    latest = result
-                    status = if (result == null) "You're using the latest version." else "Update available: v${result.versionName}"
-                    checking = false
+                when {
+                    apk?.isFile == true -> installDownloadedUpdate(context, apk!!)
+                    latest != null -> downloadAvailableUpdate()
+                    else -> checkForUpdates()
                 }
             },
             modifier = Modifier.fillMaxWidth()
         ) {
-            if (checking) CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
-            else Text("Check for updates")
+            when {
+                checking -> {
+                    CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
+                    androidx.compose.foundation.layout.Spacer(Modifier.size(8.dp))
+                    Text("Checking…")
+                }
+                downloading -> Text("Downloading… ${(progress * 100).toInt()}%")
+                apk?.isFile == true -> Text("Install update")
+                latest != null -> Text("Download update")
+                else -> Text("Check for updates")
+            }
         }
-        if (latest != null) {
-            Button(
-                enabled = !downloading,
-                onClick = {
-                    val release = latest ?: return@Button
-                    downloading = true
-                    progress = 0f
-                    status = "Downloading v${release.versionName}…"
-                    scope.launch {
-                        try {
-                            apk = downloadUpdate(release.apkUrl, context, release.versionCode) { progress = it }
-                            status = "Update downloaded. Ready to install."
-                        } catch (error: Exception) {
-                            apk = null
-                            status = if (error.message?.contains("signing certificate") == true)
-                                "This update is signed differently and can't replace this installation."
-                            else "Update download failed."
-                        } finally {
-                            downloading = false
-                        }
-                    }
-                },
-                modifier = Modifier.fillMaxWidth()
-            ) { Text(if (apk?.exists() == true) "Download again" else "Download update") }
-        }
-        if (apk?.isFile == true) {
-            Button(
-                onClick = { apk?.let { installDownloadedUpdate(context, it) } },
-                modifier = Modifier.fillMaxWidth()
-            ) { Text("Install update") }
-        }
-        Text(
-            "App version  ·  v$installedVersion",
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
     }
 }
