@@ -38,6 +38,15 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.core.content.FileProvider
 import androidx.core.app.NotificationCompat
+import java.util.concurrent.TimeUnit
+import androidx.work.WorkerParameters
+import androidx.work.Worker
+import androidx.work.WorkManager
+import androidx.work.PeriodicWorkRequestBuilder
+import androidx.work.NetworkType
+import androidx.work.ExistingPeriodicWorkPolicy
+import androidx.work.Constraints
+import androidx.core.content.ContextCompat
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -65,12 +74,14 @@ internal fun AutoUpdateChecker(onUpdateAvailable: (Long) -> Unit = {}) {
     var downloadedApk by remember { mutableStateOf<File?>(null) }
 
     LaunchedEffect(Unit) {
+        scheduleBackgroundUpdateChecks(context)
         val latest = withContext(Dispatchers.IO) { findAppUpdate(context) }
         if (latest != null) {
             release = latest
             onUpdateAvailable(latest.versionCode)
-            if (preferences.getLong("notified_version", -1L) != latest.versionCode) {
+            if (preferences.getLong("notified_version", -1L) != latest.versionCode &&
                 showUpdateNotification(context, latest)
+            ) {
                 preferences.edit().putLong("notified_version", latest.versionCode).apply()
             }
         }
@@ -223,8 +234,12 @@ internal fun NotificationsScreen(onOpenSettings: () -> Unit) {
 }
 
 
-private fun showUpdateNotification(context: Context, release: AppRelease) {
+private fun showUpdateNotification(context: Context, release: AppRelease): Boolean {
+    if (Build.VERSION.SDK_INT >= 33 &&
+        ContextCompat.checkSelfPermission(context, android.Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+    ) return false
     val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+    if (!manager.areNotificationsEnabled()) return false
     val channelId = "app_updates"
     if (Build.VERSION.SDK_INT >= 26) {
         manager.createNotificationChannel(NotificationChannel(
@@ -249,7 +264,46 @@ private fun showUpdateNotification(context: Context, release: AppRelease) {
         .setContentIntent(pendingIntent)
         .setPriority(NotificationCompat.PRIORITY_DEFAULT)
         .build()
-    manager.notify(7301, notification)
+    return try {
+        manager.notify(7301, notification)
+        true
+    } catch (_: SecurityException) {
+        false
+    }
+}
+
+private fun scheduleBackgroundUpdateChecks(context: Context) {
+    val constraints = Constraints.Builder()
+        .setRequiredNetworkType(NetworkType.CONNECTED)
+        .build()
+    val request = PeriodicWorkRequestBuilder<UpdateCheckWorker>(
+        6, TimeUnit.HOURS,
+        1, TimeUnit.HOURS
+    ).setConstraints(constraints).build()
+    WorkManager.getInstance(context).enqueueUniquePeriodicWork(
+        "mine_study_update_check",
+        ExistingPeriodicWorkPolicy.KEEP,
+        request
+    )
+}
+
+class UpdateCheckWorker(
+    context: Context,
+    parameters: WorkerParameters
+) : Worker(context, parameters) {
+    override fun doWork(): Result {
+        val latest = findAppUpdate(applicationContext) ?: return Result.success()
+        val preferences = applicationContext.getSharedPreferences(
+            "mine_study_updates", Context.MODE_PRIVATE
+        )
+        if (preferences.getLong("notified_version", -1L) == latest.versionCode) {
+            return Result.success()
+        }
+        if (showUpdateNotification(applicationContext, latest)) {
+            preferences.edit().putLong("notified_version", latest.versionCode).apply()
+        }
+        return Result.success()
+    }
 }
 
 private fun findAppUpdate(context: Context): AppRelease? {
