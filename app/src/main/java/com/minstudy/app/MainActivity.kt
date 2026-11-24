@@ -57,6 +57,7 @@ import androidx.compose.material.icons.filled.Fullscreen
 import androidx.compose.material.icons.filled.FullscreenExit
 import androidx.compose.material.icons.filled.Key
 import androidx.compose.material.icons.filled.MenuBook
+import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.Replay10
@@ -132,7 +133,15 @@ data class BatchInfo(val id: String, val name: String, val language: String = ""
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContent { MineStudyApp(); AutoUpdateChecker() }
+        setContent {
+            var updateAvailable by remember { mutableStateOf(false) }
+            val openUpdateSettings = intent.getBooleanExtra("open_update_settings", false)
+            MineStudyApp(
+                openUpdateSettings = openUpdateSettings,
+                updateAvailable = updateAvailable
+            )
+            AutoUpdateChecker(onUpdateAvailable = { updateAvailable = it })
+        }
         if (Build.VERSION.SDK_INT >= 33 && checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
             requestPermissions(arrayOf(android.Manifest.permission.POST_NOTIFICATIONS), 4107)
         }
@@ -448,7 +457,7 @@ private class StudyApi(private val context: Context) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun MineStudyApp() {
+private fun MineStudyApp(openUpdateSettings: Boolean, updateAvailable: Boolean) {
     val context = LocalContext.current
     val api = remember { StudyApi(context) }
     val scope = rememberCoroutineScope()
@@ -494,7 +503,7 @@ private fun MineStudyApp() {
                 } else if (parts.size >= 2) BatchInfo(parts[0], parts[1], parts.getOrNull(2).orEmpty(), parts.getOrNull(3).orEmpty()) else null
             }?.associateBy { it.id } ?: emptyMap())
     }
-    var screen by remember { mutableStateOf("home") }
+    var screen by remember { mutableStateOf(if (openUpdateSettings) "settings" else "home") }
     var type by remember { mutableStateOf("videos") }
     var subjects by remember { mutableStateOf(emptyList<StudyItem>()) }
     var starredSubjectIds by remember(batch) {        mutableStateOf(progressPrefs.getStringSet("starred_subjects_$batch", emptySet())?.toSet() ?: emptySet())
@@ -572,10 +581,10 @@ private fun MineStudyApp() {
             busy = true
             try {
                 subjects = api.list(api.get("/batch/${api.batchId}/subject"), "subjects")
-                screen = "home"
+                if (!openUpdateSettings) screen = "home"
                 error = ""
             } catch (e: Exception) {
-                screen = "home"
+                if (!openUpdateSettings) screen = "home"
                 error = e.message ?: "Could not load your study library"
             } finally {
                 busy = false
@@ -1123,6 +1132,7 @@ private fun MineStudyApp() {
             "player" -> "contents"
             "pdf" -> "downloads"
             "download_center" -> "home"
+            "notifications" -> "home"
             "contents" -> "chapters"
             "chapters" -> "home"
             else -> "home"
@@ -1163,6 +1173,11 @@ private fun MineStudyApp() {
                             }
                         },
                         actions = {
+                            IconButton(onClick = { screen = "notifications" }) {
+                                BadgedBox(badge = { if (updateAvailable) Badge() }) {
+                                    Icon(Icons.Default.Notifications, contentDescription = "Notifications")
+                                }
+                            }
                             IconButton(onClick = { screen = "download_center" }) {
                                 Icon(Icons.Default.Download, contentDescription = "Downloader")
                             }
@@ -1772,6 +1787,7 @@ private fun MineStudyApp() {
                         }
                     }
                     "settings" -> UpdateSettingsScreen()
+                    "notifications" -> NotificationsScreen(onOpenSettings = { screen = "settings" })
                 }
                 if (busy) LinearProgressIndicator(Modifier.fillMaxWidth().padding(top = 8.dp))
                     }
