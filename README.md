@@ -19,7 +19,7 @@ Native Android client for the Mine Study learning library, built with Kotlin, Je
 2. Use JDK 17 and allow Gradle sync to complete.
 3. Run the app on an Android device or emulator.
 
-GitHub Actions builds a debug APK on every push to `main`. Open the repository's **Actions** tab, select the latest **Build Android APK** run, and download the `mine-study-debug-apk` artifact.
+GitHub Actions builds a debug APK on every push to `main`. Every release is signed with the same permanent signing key stored at `app/debug.keystore`. CI checks the APK certificate against a pinned SHA-256 fingerprint and blocks publication if it changes. Never replace or regenerate this keystore; losing it prevents existing installations signed with it from receiving in-place updates. Keep a secure offline backup of the keystore and its passwords. Open the repository's **Actions** tab, select the latest **Build Android APK** run, and download the `mine-study-debug-apk` artifact.
 
 ## API configuration
 API base: `https://v1.sgmvv1.xyz/api/v1`
