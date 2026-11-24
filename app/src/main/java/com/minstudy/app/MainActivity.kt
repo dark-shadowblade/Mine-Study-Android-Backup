@@ -604,13 +604,32 @@ private fun MineStudyApp(latestUpdateVersion: Long) {
     }
 
     fun loadSubjects() {
-        busy = true; error = ""
+        // Always load subjects for the batch currently selected in the UI.
+        // Do not rely on a possibly stale SharedPreferences-backed API batch ID.
+        val requestedBatch = batch.trim()
+        if (requestedBatch.isBlank()) {
+            subjects = emptyList()
+            error = "Select or add a batch first."
+            screen = "home"
+            return
+        }
+        api.batchId = requestedBatch
+        busy = true
+        error = ""
         scope.launch {
             try {
-                subjects = api.list(api.get("/batch/${api.batchId}/subject"), "subjects")
-                screen = "home"
-            } catch (e: Exception) { error = e.message ?: "Could not load batches" }
-            finally { busy = false }
+                val loaded = api.list(api.get("/batch/${requestedBatch}/subject"), "subjects")
+                if (batch.trim() == requestedBatch) {
+                    subjects = loaded
+                    screen = "home"
+                }
+            } catch (e: Exception) {
+                if (batch.trim() == requestedBatch) {
+                    error = e.message ?: "Could not load subjects for this batch"
+                }
+            } finally {
+                if (batch.trim() == requestedBatch) busy = false
+            }
         }
     }
     LaunchedEffect(Unit) {
