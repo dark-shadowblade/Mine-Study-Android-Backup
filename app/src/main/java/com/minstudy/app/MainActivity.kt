@@ -228,12 +228,44 @@ private class StudyApi(private val context: Context) {
             append("/batch/search/v2?cohortId=635b83410a47c70011ca5ffb&exam=UPSC&page=$page")
             if (keyword.isNotBlank()) append("&keyword=${enc(keyword)}")
         }
-        val payload = get(query, unwrapData = true) as? JSONObject
-            ?: throw IllegalStateException("Unexpected batch search response")
-        val array = payload.optJSONArray("batches") ?: JSONArray()
+        val response = get(query, unwrapData = false)
+        fun findBatchArray(value: Any?, depth: Int = 0): JSONArray? {
+            if (depth > 6) return null
+            if (value is JSONObject) {
+                for (key in listOf("batches", "batchList", "batch_list", "results", "items", "docs", "data")) {
+                    val nested = value.opt(key)
+                    if (nested is JSONArray) return nested
+                    findBatchArray(nested, depth + 1)?.let { return it }
+                }
+                val keys = value.keys()
+                while (keys.hasNext()) findBatchArray(value.opt(keys.next()), depth + 1)?.let { return it }
+            } else if (value is JSONArray) {
+                if (value.length() == 0) return value
+                if (value.optJSONObject(0) != null) return value
+                for (index in 0 until value.length()) findBatchArray(value.opt(index), depth + 1)?.let { return it }
+            }
+            return null
+        }
+        fun findTotalPages(value: Any?, depth: Int = 0): Int? {
+            if (depth > 6 || value !is JSONObject) return null
+            val pagination = value.optJSONObject("pagination")
+            if (pagination != null) {
+                val total = pagination.optInt("totalPages", 0)
+                if (total > 0) return total
+            }
+            val direct = value.optInt("totalPages", 0)
+            if (direct > 0) return direct
+            val keys = value.keys()
+            while (keys.hasNext()) findTotalPages(value.opt(keys.next()), depth + 1)?.let { return it }
+            return null
+        }
+        val array = findBatchArray(response)
+            ?: throw IllegalStateException("Batch server returned an unrecognized response")
         val batches = (0 until array.length()).mapNotNull { index ->
             val item = array.optJSONObject(index) ?: return@mapNotNull null
-            val id = item.optString("_id").takeIf { it.isNotBlank() } ?: return@mapNotNull null
+            val id = listOf("_id", "id", "batchId", "batch_id").firstNotNullOfOrNull { key ->
+                item.optString(key).takeIf { it.isNotBlank() && it != "null" }
+            } ?: return@mapNotNull null
             // Batch search v2 exposes the official card artwork as previewImage.
             val previewImage = item.optString("previewImage").trim()
                 .takeIf { it.startsWith("https://", true) || it.startsWith("http://", true) }
@@ -270,7 +302,7 @@ private class StudyApi(private val context: Context) {
             val thumbnail = previewImage ?: findImage(item).orEmpty()
             BatchInfo(id, item.optString("name", "Unnamed batch"), item.optString("lang", ""), item.optString("class", ""), thumbnail)
         }
-        return batches to (payload.optJSONObject("pagination")?.optInt("totalPages", 1)?.coerceAtLeast(1) ?: 1)
+        return batches to (findTotalPages(response)?.coerceAtLeast(1) ?: 1)
     }
 
     suspend fun generateKeyLink(): String {
