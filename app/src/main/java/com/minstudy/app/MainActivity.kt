@@ -1222,8 +1222,8 @@ private fun MineStudyApp(openUpdateSettings: Boolean, updateAvailable: Boolean) 
                         NavigationBarItem(
                             selected = screen == "downloads",
                             onClick = { downloadRecords = DownloadRepository.list(context); screen = "downloads" },
-                            icon = { Icon(Icons.Default.Download, contentDescription = null) },
-                            label = { Text("Gallery", maxLines = 1, fontSize = 10.sp) }
+                            icon = { Icon(Icons.Default.PlayArrow, contentDescription = null) },
+                            label = { Text("Downloads", maxLines = 1, fontSize = 10.sp) }
                         )
                         NavigationBarItem(
                             selected = screen == "settings",
@@ -1381,22 +1381,6 @@ private fun MineStudyApp(openUpdateSettings: Boolean, updateAvailable: Boolean) 
                                             }
                                             Icon(Icons.Default.ArrowForward, null, tint = Color(0xFF9AA5BA), modifier = Modifier.size(20.dp))
                                         }
-                                    }
-                                }
-
-                                Card(
-                                    modifier = Modifier.fillMaxWidth().clickable { downloadRecords = DownloadRepository.list(context); screen = "downloads" },
-                                    colors = CardDefaults.cardColors(containerColor = Color(0xFF171D2A)),
-                                    shape = RoundedCornerShape(14.dp),
-                                    border = BorderStroke(1.dp, Color(0xFF30394B))
-                                ) {
-                                    Row(Modifier.fillMaxWidth().padding(horizontal = 13.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                                        Icon(Icons.Default.Download, null, tint = Color(0xFFB5A9FF), modifier = Modifier.size(23.dp))
-                                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                                            Text("Your downloads", fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.bodyMedium)
-                                            Text("${downloadRecords.size} saved files · videos, notes and PDFs", color = Color(0xFF9AA5BA), style = MaterialTheme.typography.labelSmall)
-                                        }
-                                        Icon(Icons.Default.ArrowForward, null, tint = Color(0xFF9AA5BA), modifier = Modifier.size(20.dp))
                                     }
                                 }
 
@@ -1868,7 +1852,7 @@ private fun MineStudyApp(openUpdateSettings: Boolean, updateAvailable: Boolean) 
                 ) {
                     Icon(Icons.Default.FolderOpen, null, modifier = Modifier.size(16.dp))
                     Spacer(Modifier.width(6.dp))
-                    Text("Open Gallery")
+                    Text("Open Downloads")
                 }
             }
         )
