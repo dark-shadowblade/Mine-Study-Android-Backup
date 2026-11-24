@@ -53,7 +53,7 @@ private data class AppRelease(
 )
 
 @Composable
-internal fun AutoUpdateChecker() {
+internal fun AutoUpdateChecker(onUpdateAvailable: (Boolean) -> Unit = {}) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val preferences = remember {
@@ -68,6 +68,7 @@ internal fun AutoUpdateChecker() {
         val latest = withContext(Dispatchers.IO) { findAppUpdate(context) }
         if (latest != null) {
             release = latest
+            onUpdateAvailable(true)
             if (preferences.getLong("notified_version", -1L) != latest.versionCode) {
                 showUpdateNotification(context, latest)
                 preferences.edit().putLong("notified_version", latest.versionCode).apply()
@@ -172,6 +173,56 @@ internal fun AutoUpdateChecker() {
     )
 }
 
+@Composable
+internal fun NotificationsScreen(onOpenSettings: () -> Unit) {
+    val context = LocalContext.current
+    var checking by remember { mutableStateOf(true) }
+    var release by remember { mutableStateOf<AppRelease?>(null) }
+    var checked by remember { mutableStateOf(false) }
+
+    LaunchedEffect(Unit) {
+        release = withContext(Dispatchers.IO) { findAppUpdate(context) }
+        checking = false
+        checked = true
+    }
+
+    Column(
+        modifier = Modifier.fillMaxSize().padding(top = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp)
+    ) {
+        Text("Notifications", style = MaterialTheme.typography.headlineSmall,
+            fontWeight = androidx.compose.ui.text.font.FontWeight.Bold)
+        if (checking) {
+            LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+            Text("Checking for notifications…", color = MaterialTheme.colorScheme.onSurfaceVariant)
+        } else if (release != null) {
+            Column(
+                modifier = Modifier.fillMaxWidth()
+                    .padding(14.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Text("UPDATE AVAILABLE", style = MaterialTheme.typography.labelSmall,
+                    color = androidx.compose.ui.graphics.Color(0xFFAAA2FF),
+                    fontWeight = androidx.compose.ui.text.font.FontWeight.Bold)
+                Text("Mine Study · v${release!!.versionName}",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold)
+                Text("A newer version is ready. Open Settings to download and install it.",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MaterialTheme.typography.bodyMedium)
+                Button(onClick = onOpenSettings, modifier = Modifier.fillMaxWidth()) {
+                    Text("Open update settings")
+                }
+            }
+        } else if (checked) {
+            Text("You're all caught up. No new updates right now.",
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MaterialTheme.typography.bodyMedium)
+        }
+    }
+}
+
+
 private fun showUpdateNotification(context: Context, release: AppRelease) {
     val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
     val channelId = "app_updates"
@@ -180,12 +231,16 @@ private fun showUpdateNotification(context: Context, release: AppRelease) {
             channelId, "App updates", NotificationManager.IMPORTANCE_DEFAULT
         ).apply { description = "Notifications when a Mine Study update is available" })
     }
-    val launchIntent = context.packageManager.getLaunchIntentForPackage(context.packageName)
-    val pendingIntent = launchIntent?.let {
-        PendingIntent.getActivity(context, 7301,
-            it.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP),
-            PendingIntent.FLAG_UPDATE_CURRENT or (if (Build.VERSION.SDK_INT >= 23) PendingIntent.FLAG_IMMUTABLE else 0))
+    val launchIntent = Intent(context, MainActivity::class.java).apply {
+        putExtra("open_update_settings", true)
+        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
     }
+    val pendingIntent = PendingIntent.getActivity(
+        context,
+        7301,
+        launchIntent,
+        PendingIntent.FLAG_UPDATE_CURRENT or (if (Build.VERSION.SDK_INT >= 23) PendingIntent.FLAG_IMMUTABLE else 0)
+    )
     val notification = NotificationCompat.Builder(context, channelId)
         .setSmallIcon(context.applicationInfo.icon)
         .setContentTitle("Mine Study update available")
