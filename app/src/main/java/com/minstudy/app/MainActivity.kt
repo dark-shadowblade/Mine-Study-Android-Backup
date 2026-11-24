@@ -406,10 +406,10 @@ private class StudyApi(private val context: Context) {
         // The API may return the list directly or wrap it in an object
         // (for example { subjects: [...] } or { data: { subjects: [...] } }).
         // Resolve either shape instead of rejecting valid subject responses.
-        val array = value as? JSONArray ?: findArray(value)
+        val array = value as? JSONArray ?: findArray(value, kind)
             ?: throw IllegalStateException("Unexpected API response: no $kind list was found")
 
-        return (0 until array.length()).mapNotNull { i ->
+        val parsed = (0 until array.length()).mapNotNull { i ->
             val obj = array.optJSONObject(i) ?: return@mapNotNull null
             val id = when (kind) {
                 "subjects" -> first(obj, "_id", "id", "subjectId", "subject_id")
@@ -417,36 +417,80 @@ private class StudyApi(private val context: Context) {
                 "contents" -> first(obj, "_id", "videoId", "video_id", "id")
                 else -> null
             } ?: return@mapNotNull null
-
             val title = when (kind) {
                 "subjects" -> first(obj, "subject", "name", "title", "subjectName")
                 "chapters" -> first(obj, "name", "chapter", "title")
                 "contents" -> first(obj, "name", "topic", "title")
                 else -> null
             } ?: "Untitled"
-            val subtitle = if (kind == "contents") {
-                first(obj, "duration", "date", "topic") ?: ""
-            } else ""
+            val subtitle = if (kind == "contents") first(obj, "duration", "date", "topic") ?: "" else ""
             StudyItem(id, title, subtitle, obj)
         }
+        if (array.length() > 0 && parsed.isEmpty()) {
+            throw IllegalStateException("The API returned a $kind list, but its entries did not contain recognized IDs.")
+        }
+        return parsed
     }
 
-    private fun findArray(value: Any?): JSONArray? {
-        if (value is JSONArray) return value
-        if (value is JSONObject) {
-            for (key in listOf("data", "subjects", "chapters", "contents", "videos", "result", "items")) {
-                val v = value.opt(key)
-                if (v is JSONArray) return v
-                if (v is JSONObject) findArray(v)?.let { return it }
+    // Only accept arrays containing records with IDs appropriate for the requested screen.
+    private fun findArray(value: Any?, kind: String, depth: Int = 0): JSONArray? {
+        if (depth > 10) return null
+        val idKeys = when (kind) {
+            "subjects" -> arrayOf("_id", "id", "subjectId", "subject_id")
+            "chapters" -> arrayOf("chapter_id", "_id", "id", "chapterId")
+            "contents" -> arrayOf("_id", "videoId", "video_id", "id")
+            else -> emptyArray()
+        }
+        var best: JSONArray? = null
+        var bestScore = 0
+        fun score(array: JSONArray): Int {
+            var count = 0
+            for (i in 0 until array.length()) {
+                val item = array.optJSONObject(i) ?: continue
+                if (first(item, *idKeys) != null) count++
             }
-            val keys = value.keys()
-            while (keys.hasNext()) findArray(value.opt(keys.next()))?.let { return it }
+            return count
+        }
+        fun consider(candidate: JSONArray?) {
+            if (candidate == null) return
+            val candidateScore = score(candidate)
+            if (candidateScore > bestScore) {
+                best = candidate
+                bestScore = candidateScore
+            }
+        }
+        when (value) {
+            is JSONArray -> {
+                consider(value)
+                for (i in 0 until value.length()) consider(findArray(value.opt(i), kind, depth + 1))
+            }
+            is JSONObject -> {
+                val preferred = when (kind) {
+                    "subjects" -> listOf("subjects", "data", "result", "items")
+                    "chapters" -> listOf("chapters", "data", "result", "items")
+                    else -> listOf("contents", "videos", "data", "result", "items")
+                }
+                for (key in preferred) consider(findArray(value.opt(key), kind, depth + 1))
+                val keys = value.keys()
+                while (keys.hasNext()) consider(findArray(value.opt(keys.next()), kind, depth + 1))
+            }
+        }
+        return best
+    }
+
+    private fun first(obj: JSONObject, vararg keys: String): String? {
+        for (wanted in keys) {
+            val iterator = obj.keys()
+            while (iterator.hasNext()) {
+                val actual = iterator.next()
+                if (actual.equals(wanted, ignoreCase = true)) {
+                    val value = obj.optString(actual)
+                    if (value.isNotBlank() && value != "null") return value
+                }
+            }
         }
         return null
     }
-
-    private fun first(obj: JSONObject, vararg keys: String): String? =
-        keys.firstNotNullOfOrNull { key -> obj.optString(key).takeIf { it.isNotBlank() && it != "null" } }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
