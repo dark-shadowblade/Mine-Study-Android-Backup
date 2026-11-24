@@ -38,14 +38,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.core.content.FileProvider
 import androidx.core.app.NotificationCompat
-import java.util.concurrent.TimeUnit
-import androidx.work.WorkerParameters
-import androidx.work.Worker
-import androidx.work.WorkManager
-import androidx.work.PeriodicWorkRequestBuilder
-import androidx.work.NetworkType
-import androidx.work.ExistingPeriodicWorkPolicy
-import androidx.work.Constraints
 import androidx.core.content.ContextCompat
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -74,7 +66,6 @@ internal fun AutoUpdateChecker(onUpdateAvailable: (Long) -> Unit = {}) {
     var downloadedApk by remember { mutableStateOf<File?>(null) }
 
     LaunchedEffect(Unit) {
-        scheduleBackgroundUpdateChecks(context)
         val latest = withContext(Dispatchers.IO) { findAppUpdate(context) }
         if (latest != null) {
             release = latest
@@ -269,40 +260,6 @@ private fun showUpdateNotification(context: Context, release: AppRelease): Boole
         true
     } catch (_: SecurityException) {
         false
-    }
-}
-
-private fun scheduleBackgroundUpdateChecks(context: Context) {
-    val constraints = Constraints.Builder()
-        .setRequiredNetworkType(NetworkType.CONNECTED)
-        .build()
-    val request = PeriodicWorkRequestBuilder<UpdateCheckWorker>(
-        6, TimeUnit.HOURS,
-        1, TimeUnit.HOURS
-    ).setConstraints(constraints).build()
-    WorkManager.getInstance(context).enqueueUniquePeriodicWork(
-        "mine_study_update_check",
-        ExistingPeriodicWorkPolicy.KEEP,
-        request
-    )
-}
-
-class UpdateCheckWorker(
-    context: Context,
-    parameters: WorkerParameters
-) : Worker(context, parameters) {
-    override fun doWork(): Result {
-        val latest = findAppUpdate(applicationContext) ?: return Result.success()
-        val preferences = applicationContext.getSharedPreferences(
-            "mine_study_updates", Context.MODE_PRIVATE
-        )
-        if (preferences.getLong("notified_version", -1L) == latest.versionCode) {
-            return Result.success()
-        }
-        if (showUpdateNotification(applicationContext, latest)) {
-            preferences.edit().putLong("notified_version", latest.versionCode).apply()
-        }
-        return Result.success()
     }
 }
 
