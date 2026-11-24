@@ -133,8 +133,7 @@ data class BatchInfo(val id: String, val name: String, val language: String = ""
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        // Push setup must never prevent the app from opening if Firebase is unavailable.
-        runCatching { MineStudyMessagingService.subscribe(this) }
+        // FCM startup subscription temporarily disabled while isolating reported launch crash.
         setContent {
             var latestUpdateVersion by remember { mutableLongStateOf(0L) }
             val openUpdateSettings = intent.getBooleanExtra("open_update_settings", false)
