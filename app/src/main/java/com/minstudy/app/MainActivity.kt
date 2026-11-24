@@ -2263,7 +2263,7 @@ private fun VideoScreen(
     DisposableEffect(fullScreen) {
         val window = activity?.window
         if (fullScreen) {
-            activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_PORTRAIT
+            activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_REVERSE_PORTRAIT
             if (window != null) WindowInsetsControllerCompat(window, window.decorView).hide(WindowInsetsCompat.Type.systemBars())
         } else {
             activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
@@ -2356,7 +2356,7 @@ private fun VideoScreen(
     }
 
     @Composable
-    fun PlayerOverlay(landscape: Boolean) {
+    fun PlayerOverlay(landscape: Boolean, fullScreenMode: Boolean = landscape) {
         val iconSize = if (landscape) 28.dp else 23.dp
         Column(
             Modifier.fillMaxSize()
@@ -2365,11 +2365,11 @@ private fun VideoScreen(
             verticalArrangement = Arrangement.SpaceBetween
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                IconButton(onClick = { if (landscape) fullScreen = false else onBack() }, modifier = Modifier.size(32.dp)) {
+                IconButton(onClick = { if (fullScreenMode) fullScreen = false else onBack() }, modifier = Modifier.size(32.dp)) {
                     Icon(Icons.Default.ArrowBack, "Back", tint = Color.White)
                 }
                 Text(title, color = Color.White, maxLines = 1, style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f))
-                if (landscape) {
+                if (fullScreenMode) {
                     TextButton(onClick = { showResources = true }, contentPadding = PaddingValues(horizontal = 7.dp, vertical = 2.dp)) {
                         Icon(Icons.Default.MenuBook, contentDescription = null, modifier = Modifier.size(17.dp), tint = Color.White)
                         Spacer(Modifier.width(4.dp))
@@ -2658,7 +2658,7 @@ private fun VideoScreen(
             if (controlsLocked) {
                 Text("Tap to unlock", color = Color.White, modifier = Modifier.align(Alignment.Center)
                     .background(Color(0xAA000000), RoundedCornerShape(18.dp)).padding(horizontal = 16.dp, vertical = 9.dp))
-            } else if (showControls) PlayerOverlay(landscape = true)
+            } else if (showControls) PlayerOverlay(landscape = false, fullScreenMode = true)
             if (showResources) {
                 Box(Modifier.fillMaxSize().background(Color(0x99000000)).clickable { showResources = false }) {
                     Card(
