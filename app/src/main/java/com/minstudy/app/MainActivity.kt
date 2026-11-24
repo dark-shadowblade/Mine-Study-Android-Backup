@@ -996,7 +996,8 @@ private fun MineStudyApp() {
 
         // Page one always starts a fresh search; invalidate old responses.
         if (page == 1) {
-            batchSearchJob?.cancel()            batchSearchGeneration++
+            batchSearchJob?.cancel()
+            batchSearchGeneration++
             batchSearchResults = emptyList()
             batchSearchPage = 1
             batchSearchExecuted = false
@@ -2493,7 +2494,8 @@ private fun VideoScreen(
                                     )
                                 }
                         ) {
-                            val centerY = size.height / 2f                            val fraction = volume.toFloat() / maxVolume.toFloat()
+                            val centerY = size.height / 2f
+                            val fraction = volume.toFloat() / maxVolume.toFloat()
                             val endX = size.width * fraction
                             drawLine(Color.White.copy(alpha = 0.32f), Offset(0f, centerY), Offset(size.width, centerY), 2.dp.toPx(), cap = StrokeCap.Round)
                             drawLine(Color.White, Offset(0f, centerY), Offset(endX, centerY), 2.dp.toPx(), cap = StrokeCap.Round)
