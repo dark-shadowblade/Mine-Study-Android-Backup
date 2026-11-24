@@ -1892,6 +1892,16 @@ private fun ItemList(
                     val itemPercent = queueEntry?.takeIf { it.total > 0L }?.let {
                         ((it.bytes * 100L) / it.total).toInt().coerceIn(0, 99)
                     } ?: if (activeDownloadKey == itemKey && activeDownloadCategory == downloadCategory) activeDownloadPercent else 0
+                    val pulseTransition = androidx.compose.animation.core.rememberInfiniteTransition(label = "download-pulse")
+                    val downloadPulse by pulseTransition.animateFloat(
+                        initialValue = 0.88f,
+                        targetValue = 1.12f,
+                        animationSpec = androidx.compose.animation.core.infiniteRepeatable(
+                            animation = androidx.compose.animation.core.tween(650),
+                            repeatMode = androidx.compose.animation.core.RepeatMode.Reverse
+                        ),
+                        label = "download-pulse"
+                    )
 
                     Card(
                         modifier = Modifier.fillMaxWidth().animateContentSize().clickable { onSelect(item) },
@@ -1979,7 +1989,7 @@ private fun ItemList(
                                 ) {
                                     when {
                                         downloading -> Box(contentAlignment = Alignment.Center, modifier = Modifier.size(29.dp)) {
-                                            CircularProgressIndicator(Modifier.size(25.dp), strokeWidth = 2.dp, color = Color(0xFFB5A9FF))
+                                            CircularProgressIndicator(Modifier.size(25.dp).graphicsLayer { scaleX = if (downloading) downloadPulse else 1f; scaleY = if (downloading) downloadPulse else 1f }, strokeWidth = 2.dp, color = Color(0xFFB5A9FF))
                                             Text(if (queueEntry?.active == false) "Q" else "$itemPercent%", fontSize = 7.sp, color = Color.White)
                                         }
                                         downloaded -> Icon(Icons.Default.CheckCircle, "Downloaded", tint = Color(0xFF38C879), modifier = Modifier.size(22.dp))
