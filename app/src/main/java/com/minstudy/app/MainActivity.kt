@@ -1882,16 +1882,10 @@ private fun MineStudyApp(openUpdateSettings: Boolean, latestUpdateVersion: Long)
             },
             confirmButton = {},
             dismissButton = {
-                TextButton(
-                    onClick = {
-                        downloadRecords = DownloadRepository.list(context)
-                        showSettings = false
-                        screen = "downloads"
+                if (api.apiKey.isNotBlank()) {
+                    TextButton(onClick = { showSettings = false }) {
+                        Text("Done")
                     }
-                ) {
-                    Icon(Icons.Default.FolderOpen, null, modifier = Modifier.size(16.dp))
-                    Spacer(Modifier.width(6.dp))
-                    Text("Open Downloads")
                 }
             }
         )
