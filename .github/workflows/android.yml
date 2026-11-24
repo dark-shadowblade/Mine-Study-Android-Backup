@@ -31,6 +31,13 @@ jobs:
         run: |
           mkdir -p "$HOME/.android"
           cp app/debug.keystore "$HOME/.android/debug.keystore"
+      - name: Inspect stable signing key
+        run: |
+          set -euo pipefail
+          echo "=== Repository keystore ==="
+          keytool -list -v -keystore app/debug.keystore -storepass android
+          echo "=== Android debug keystore ==="
+          keytool -list -v -keystore "$HOME/.android/debug.keystore" -storepass android
       - name: Build debug APK
         run: gradle assembleDebug -PversionCode=${{ github.run_number }}
       - name: Compare APK signing certificates with v1.0.43
