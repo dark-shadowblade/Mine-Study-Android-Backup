@@ -309,33 +309,12 @@ private suspend fun downloadUpdate(
             throw IllegalStateException("APK does not match this update")
         }
 
-        @Suppress("DEPRECATION")
-        val installedFlags = if (Build.VERSION.SDK_INT >= 28) {
-            PackageManager.GET_SIGNING_CERTIFICATES
-        } else {
-            PackageManager.GET_SIGNATURES
-        }
-        val installedInfo = context.packageManager.getPackageInfo(
-            context.packageName,
-            installedFlags
-        )
-        val installedSigners = if (Build.VERSION.SDK_INT >= 28) {
-            installedInfo.signingInfo?.apkContentsSigners?.map { it.toCharsString() }?.toSet()
-        } else {
-            @Suppress("DEPRECATION")
-            installedInfo.signatures?.map { it.toCharsString() }?.toSet()
-        }
-        val updateSigners = if (Build.VERSION.SDK_INT >= 28) {
-            archiveInfo.signingInfo?.apkContentsSigners?.map { it.toCharsString() }?.toSet()
-        } else {
-            @Suppress("DEPRECATION")
-            archiveInfo.signatures?.map { it.toCharsString() }?.toSet()
-        }
-        if (installedSigners.isNullOrEmpty() || updateSigners.isNullOrEmpty() ||
-            installedSigners != updateSigners
-        ) {
-            throw IllegalStateException("Update signing certificate does not match installed app")
-        }
+        // Do not pre-empt Android's package installer with a second
+        // certificate comparison. PackageInstaller verifies update
+        // signing compatibility against the currently installed package.
+        // A locally computed mismatch can be a false negative on newer
+        // Android signing schemes and incorrectly block a valid update.
+
 
         if (target.exists() && !target.delete()) {
             throw IllegalStateException("Could not replace cached APK")
