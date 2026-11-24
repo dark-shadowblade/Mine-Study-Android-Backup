@@ -131,7 +131,7 @@ data class BatchInfo(val id: String, val name: String, val language: String = ""
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContent { MineStudyApp(); AutoUpdateChecker() }
+        setContent { MineStudyApp() }
         if (Build.VERSION.SDK_INT >= 33 && checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
             requestPermissions(arrayOf(android.Manifest.permission.POST_NOTIFICATIONS), 4107)
         }
@@ -1086,7 +1086,7 @@ private fun MineStudyApp() {
                 }
             },
             bottomBar = {
-                if (screen in setOf("home", "all_batches", "my_batches", "downloads")) {
+                if (screen in setOf("home", "all_batches", "my_batches", "downloads", "settings")) {
                     NavigationBar(containerColor = Color(0xFF111622)) {
                         NavigationBarItem(
                             selected = screen == "home",
@@ -1098,7 +1098,7 @@ private fun MineStudyApp() {
                             selected = screen == "all_batches",
                             onClick = { screen = "all_batches" },
                             icon = { Icon(Icons.Default.Search, contentDescription = null) },
-                            label = { Text("Batches") }
+                            label = { Text("All batches") }
                         )
                         NavigationBarItem(
                             selected = screen == "my_batches",
@@ -1112,6 +1112,12 @@ private fun MineStudyApp() {
                             icon = { Icon(Icons.Default.Download, contentDescription = null) },
                             label = { Text("Gallery") }
                         )
+                        NavigationBarItem(
+                            selected = screen == "settings",
+                            onClick = { screen = "settings" },
+                            icon = { Icon(Icons.Default.Settings, contentDescription = null) },
+                            label = { Text("Settings") }
+                        )
                     }
                 }
             },
@@ -1119,6 +1125,7 @@ private fun MineStudyApp() {
         ) { padding ->
             Column(Modifier.fillMaxSize().padding(padding).padding(horizontal = if (screen == "player") 0.dp else 16.dp)) {
                 AnimatedContent(
+                    modifier = Modifier.weight(1f).fillMaxWidth(),
                     targetState = screen,
                     transitionSpec = {
                         (fadeIn(tween(170)) + slideInHorizontally(tween(170)) { it / 24 }) togetherWith
@@ -1126,7 +1133,8 @@ private fun MineStudyApp() {
                     },
                     label = "screen-transition"
                 ) { activeScreen ->
-                when (activeScreen) {
+                    Column(Modifier.fillMaxSize()) {
+                    when (activeScreen) {
                     "home" -> {
                         if (apiKey.isBlank()) {
                             Card(
@@ -1639,8 +1647,10 @@ private fun MineStudyApp() {
                             downloadRecords = DownloadRepository.list(context)
                         }
                     }
+                    "settings" -> UpdateSettingsScreen()
                 }
                 if (busy) LinearProgressIndicator(Modifier.fillMaxWidth().padding(top = 8.dp))
+                    }
                 }
             }
         }
