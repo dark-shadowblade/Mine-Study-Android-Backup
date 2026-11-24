@@ -172,7 +172,7 @@ private class StudyApi(private val context: Context) {
         }
 
     var batchId: String
-        get() = prefs.getString("batch_id", BATCH_ONE) ?: BATCH_ONE
+        get() = prefs.getString("batch_id", "") ?: ""
         set(value) { prefs.edit().putString("batch_id", value).apply() }
 
     // Mirrors Mine-Study/index.html request(): validate the envelope, then
@@ -230,12 +230,69 @@ private class StudyApi(private val context: Context) {
             append("/batch/search/v2?cohortId=635b83410a47c70011ca5ffb&exam=UPSC&page=$page")
             if (keyword.isNotBlank()) append("&keyword=${enc(keyword)}")
         }
-        val payload = get(query, unwrapData = true) as? JSONObject
-            ?: throw IllegalStateException("Unexpected batch search response")
-        val array = payload.optJSONArray("batches") ?: JSONArray()
+        val response = get(query, unwrapData = false)
+        val batchIdKeys = setOf("_id", "id", "batchId", "batch_id", "batchID", "batch_id")
+        var emptyBatchArray: JSONArray? = null
+        fun hasBatchIdentity(item: JSONObject): Boolean {
+            val keys = item.keys()
+            while (keys.hasNext()) {
+                val key = keys.next()
+                if (batchIdKeys.any { it.equals(key, ignoreCase = true) } &&
+                    item.optString(key).isNotBlank() && item.optString(key) != "null") return true
+            }
+            return false
+        }
+        fun findBatchArray(value: Any?, depth: Int = 0): JSONArray? {
+            if (depth > 8) return null
+            if (value is JSONObject) {
+                val preferred = listOf("batches", "batchList", "batch_list", "results", "items", "docs")
+                for (key in preferred) {
+                    val nested = value.opt(key)
+                    if (nested is JSONArray && (0 until nested.length()).any { nested.optJSONObject(it)?.let(::hasBatchIdentity) == true }) return nested
+                    findBatchArray(nested, depth + 1)?.let { return it }
+                }
+                val keys = value.keys()
+                while (keys.hasNext()) {
+                    val nested = value.opt(keys.next())
+                    findBatchArray(nested, depth + 1)?.let { return it }
+                }
+            } else if (value is JSONArray) {
+                if (value.length() == 0) {
+                    if (emptyBatchArray == null) emptyBatchArray = value
+                } else if ((0 until value.length()).any { value.optJSONObject(it)?.let(::hasBatchIdentity) == true }) {
+                    return value
+                } else {
+                    for (index in 0 until value.length()) findBatchArray(value.opt(index), depth + 1)?.let { return it }
+                }
+            }
+            return null
+        }
+        fun findTotalPages(value: Any?, depth: Int = 0): Int? {
+            if (depth > 8 || value !is JSONObject) return null
+            val pageKeys = setOf("totalPages", "total_pages", "totalPage", "total_page", "pages")
+            val keys = value.keys()
+            while (keys.hasNext()) {
+                val key = keys.next()
+                val nested = value.opt(key)
+                if (pageKeys.any { it.equals(key, ignoreCase = true) }) {
+                    val total = when (nested) {
+                        is Number -> nested.toInt()
+                        is String -> nested.toIntOrNull() ?: 0
+                        else -> 0
+                    }
+                    if (total > 0) return total
+                }
+                findTotalPages(nested, depth + 1)?.let { return it }
+            }
+            return null
+        }
+        val array = findBatchArray(response) ?: emptyBatchArray
+            ?: throw IllegalStateException("Batch server returned an unrecognized response")
         val batches = (0 until array.length()).mapNotNull { index ->
             val item = array.optJSONObject(index) ?: return@mapNotNull null
-            val id = item.optString("_id").takeIf { it.isNotBlank() } ?: return@mapNotNull null
+            val id = listOf("_id", "id", "batchId", "batch_id").firstNotNullOfOrNull { key ->
+                item.optString(key).takeIf { it.isNotBlank() && it != "null" }
+            } ?: return@mapNotNull null
             // Batch search v2 exposes the official card artwork as previewImage.
             val previewImage = item.optString("previewImage").trim()
                 .takeIf { it.startsWith("https://", true) || it.startsWith("http://", true) }
@@ -272,7 +329,8 @@ private class StudyApi(private val context: Context) {
             val thumbnail = previewImage ?: findImage(item).orEmpty()
             BatchInfo(id, item.optString("name", "Unnamed batch"), item.optString("lang", ""), item.optString("class", ""), thumbnail)
         }
-        return batches to (payload.optJSONObject("pagination")?.optInt("totalPages", 1)?.coerceAtLeast(1) ?: 1)
+        // If the server omits pagination metadata, allow callers to scan pages until an empty page.
+        return batches to (findTotalPages(response)?.coerceAtLeast(1) ?: 50)
     }
 
     suspend fun generateKeyLink(): String {
@@ -298,7 +356,9 @@ private class StudyApi(private val context: Context) {
 
     suspend fun verifyKey(candidate: String, onStatus: (String) -> Unit = {}): Int {
         if (candidate.isBlank()) throw IllegalStateException("Enter an API key first")
-        val subjectPath = "/batch/$batchId/subject"
+        // Keep the legacy target only for API-key validation; it is never
+        // selected, saved, or shown as a user's batch.
+        val subjectPath = "/batch/${batchId.ifBlank { BATCH_ONE }}/subject"
 
         // Check first: a key may already be activated even after app data is cleared.
         onStatus("Checking whether API key is already activated...")
@@ -499,32 +559,13 @@ private fun MineStudyApp(latestUpdateVersion: Long) {
     }
 
     fun loadSubjects() {
-        // Always load subjects for the batch currently selected in the UI.
-        // Do not rely on a possibly stale SharedPreferences-backed API batch ID.
-        val requestedBatch = batch.trim()
-        if (requestedBatch.isBlank()) {
-            subjects = emptyList()
-            error = "Select or add a batch first."
-            screen = "home"
-            return
-        }
-        api.batchId = requestedBatch
-        busy = true
-        error = ""
+        busy = true; error = ""
         scope.launch {
             try {
-                val loaded = api.list(api.get("/batch/${requestedBatch}/subject"), "subjects")
-                if (batch.trim() == requestedBatch) {
-                    subjects = loaded
-                    screen = "home"
-                }
-            } catch (e: Exception) {
-                if (batch.trim() == requestedBatch) {
-                    error = e.message ?: "Could not load subjects for this batch"
-                }
-            } finally {
-                if (batch.trim() == requestedBatch) busy = false
-            }
+                subjects = api.list(api.get("/batch/${api.batchId}/subject"), "subjects")
+                screen = "home"
+            } catch (e: Exception) { error = e.message ?: "Could not load batches" }
+            finally { busy = false }
         }
     }
     LaunchedEffect(Unit) {
@@ -1140,45 +1181,26 @@ private fun MineStudyApp(latestUpdateVersion: Long) {
                                 }
                             }
                             val downloadingNow = downloadState.queueItems.any { it.active && !it.paused }
-                            val downloadIconTransition = androidx.compose.animation.core.rememberInfiniteTransition(label = "downloader-fill")
-                            val downloadFill by downloadIconTransition.animateFloat(
-                                initialValue = 0f,
-                                targetValue = 1f,
+                            val downloadIconTransition = androidx.compose.animation.core.rememberInfiniteTransition(label = "downloader-icon")
+                            val downloadIconScale by downloadIconTransition.animateFloat(
+                                initialValue = 1f,
+                                targetValue = 1.18f,
                                 animationSpec = androidx.compose.animation.core.infiniteRepeatable(
-                                    animation = tween(1400, easing = androidx.compose.animation.core.LinearEasing),
-                                    repeatMode = androidx.compose.animation.core.RepeatMode.Restart
+                                    animation = tween(650),
+                                    repeatMode = androidx.compose.animation.core.RepeatMode.Reverse
                                 ),
-                                label = "downloader-ring-fill"
+                                label = "downloader-pulse"
                             )
                             IconButton(onClick = { screen = "download_center" }) {
-                                if (downloadingNow) {
-                                    Canvas(modifier = Modifier.size(26.dp)) {
-                                        val diameter = size.minDimension
-                                        val center = Offset(size.width / 2f, size.height / 2f)
-                                        val baseRadius = diameter * 0.36f
-                                        // Three staggered, expanding rings recreate the supplied GIF's ripple.
-                                        repeat(3) { ring ->
-                                            val progress = (downloadFill + ring / 3f) % 1f
-                                            drawCircle(
-                                                color = Color(0xFFBEB8E8).copy(alpha = (1f - progress) * 0.72f),
-                                                radius = baseRadius + diameter * 0.14f * progress,
-                                                center = center,
-                                                style = androidx.compose.ui.graphics.drawscope.Stroke(width = diameter * 0.025f)
-                                            )
-                                        }
-                                        drawCircle(color = Color(0xFF17113F), radius = baseRadius, center = center)
-                                        val arrowStroke = diameter * 0.075f
-                                        drawLine(Color.White, Offset(center.x, center.y - diameter * 0.19f), Offset(center.x, center.y + diameter * 0.15f), arrowStroke, cap = StrokeCap.Round)
-                                        drawLine(Color.White, Offset(center.x - diameter * 0.14f, center.y + diameter * 0.01f), Offset(center.x, center.y + diameter * 0.16f), arrowStroke, cap = StrokeCap.Round)
-                                        drawLine(Color.White, Offset(center.x + diameter * 0.14f, center.y + diameter * 0.01f), Offset(center.x, center.y + diameter * 0.16f), arrowStroke, cap = StrokeCap.Round)
-                                    }
-                                } else {
-                                    Icon(
-                                        Icons.Default.Download,
-                                        contentDescription = "Downloader",
-                                        tint = LocalContentColor.current
-                                    )
-                                }
+                                Icon(
+                                    Icons.Default.Download,
+                                    contentDescription = "Downloader",
+                                    modifier = Modifier.graphicsLayer {
+                                        scaleX = if (downloadingNow) downloadIconScale else 1f
+                                        scaleY = if (downloadingNow) downloadIconScale else 1f
+                                    },
+                                    tint = if (downloadingNow) Color(0xFFB5A9FF) else LocalContentColor.current
+                                )
                             }
                         },
                         colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFF0B0D14))
