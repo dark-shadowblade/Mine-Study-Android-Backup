@@ -1181,26 +1181,43 @@ private fun MineStudyApp(latestUpdateVersion: Long) {
                                 }
                             }
                             val downloadingNow = downloadState.queueItems.any { it.active && !it.paused }
-                            val downloadIconTransition = androidx.compose.animation.core.rememberInfiniteTransition(label = "downloader-icon")
-                            val downloadIconScale by downloadIconTransition.animateFloat(
-                                initialValue = 1f,
-                                targetValue = 1.18f,
+                            val downloadIconTransition = androidx.compose.animation.core.rememberInfiniteTransition(label = "downloader-fill")
+                            val downloadFill by downloadIconTransition.animateFloat(
+                                initialValue = 0f,
+                                targetValue = 1f,
                                 animationSpec = androidx.compose.animation.core.infiniteRepeatable(
-                                    animation = tween(650),
-                                    repeatMode = androidx.compose.animation.core.RepeatMode.Reverse
+                                    animation = tween(1400, easing = androidx.compose.animation.core.LinearEasing),
+                                    repeatMode = androidx.compose.animation.core.RepeatMode.Restart
                                 ),
-                                label = "downloader-pulse"
+                                label = "downloader-ring-fill"
                             )
                             IconButton(onClick = { screen = "download_center" }) {
-                                Icon(
-                                    Icons.Default.Download,
-                                    contentDescription = "Downloader",
-                                    modifier = Modifier.graphicsLayer {
-                                        scaleX = if (downloadingNow) downloadIconScale else 1f
-                                        scaleY = if (downloadingNow) downloadIconScale else 1f
-                                    },
-                                    tint = if (downloadingNow) Color(0xFFB5A9FF) else LocalContentColor.current
-                                )
+                                if (downloadingNow) {
+                                    Box(
+                                        modifier = Modifier.size(26.dp),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        CircularProgressIndicator(
+                                            progress = { downloadFill },
+                                            modifier = Modifier.fillMaxSize(),
+                                            color = Color.White,
+                                            trackColor = Color(0xFF626875),
+                                            strokeWidth = 2.6.dp
+                                        )
+                                        Icon(
+                                            Icons.Default.Download,
+                                            contentDescription = "Downloader",
+                                            tint = Color.White,
+                                            modifier = Modifier.size(14.dp)
+                                        )
+                                    }
+                                } else {
+                                    Icon(
+                                        Icons.Default.Download,
+                                        contentDescription = "Downloader",
+                                        tint = LocalContentColor.current
+                                    )
+                                }
                             }
                         },
                         colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFF0B0D14))
