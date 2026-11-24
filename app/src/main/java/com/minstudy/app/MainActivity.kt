@@ -229,37 +229,62 @@ private class StudyApi(private val context: Context) {
             if (keyword.isNotBlank()) append("&keyword=${enc(keyword)}")
         }
         val response = get(query, unwrapData = false)
+        val batchIdKeys = setOf("_id", "id", "batchId", "batch_id", "batchID", "batch_id")
+        var emptyBatchArray: JSONArray? = null
+        fun hasBatchIdentity(item: JSONObject): Boolean {
+            val keys = item.keys()
+            while (keys.hasNext()) {
+                val key = keys.next()
+                if (batchIdKeys.any { it.equals(key, ignoreCase = true) } &&
+                    item.optString(key).isNotBlank() && item.optString(key) != "null") return true
+            }
+            return false
+        }
         fun findBatchArray(value: Any?, depth: Int = 0): JSONArray? {
-            if (depth > 6) return null
+            if (depth > 8) return null
             if (value is JSONObject) {
-                for (key in listOf("batches", "batchList", "batch_list", "results", "items", "docs", "data")) {
+                val preferred = listOf("batches", "batchList", "batch_list", "results", "items", "docs")
+                for (key in preferred) {
                     val nested = value.opt(key)
-                    if (nested is JSONArray) return nested
+                    if (nested is JSONArray && (0 until nested.length()).any { nested.optJSONObject(it)?.let(::hasBatchIdentity) == true }) return nested
                     findBatchArray(nested, depth + 1)?.let { return it }
                 }
                 val keys = value.keys()
-                while (keys.hasNext()) findBatchArray(value.opt(keys.next()), depth + 1)?.let { return it }
+                while (keys.hasNext()) {
+                    val nested = value.opt(keys.next())
+                    findBatchArray(nested, depth + 1)?.let { return it }
+                }
             } else if (value is JSONArray) {
-                if (value.length() == 0) return value
-                if (value.optJSONObject(0) != null) return value
-                for (index in 0 until value.length()) findBatchArray(value.opt(index), depth + 1)?.let { return it }
+                if (value.length() == 0) {
+                    if (emptyBatchArray == null) emptyBatchArray = value
+                } else if ((0 until value.length()).any { value.optJSONObject(it)?.let(::hasBatchIdentity) == true }) {
+                    return value
+                } else {
+                    for (index in 0 until value.length()) findBatchArray(value.opt(index), depth + 1)?.let { return it }
+                }
             }
             return null
         }
         fun findTotalPages(value: Any?, depth: Int = 0): Int? {
-            if (depth > 6 || value !is JSONObject) return null
-            val pagination = value.optJSONObject("pagination")
-            if (pagination != null) {
-                val total = pagination.optInt("totalPages", 0)
-                if (total > 0) return total
-            }
-            val direct = value.optInt("totalPages", 0)
-            if (direct > 0) return direct
+            if (depth > 8 || value !is JSONObject) return null
+            val pageKeys = setOf("totalPages", "total_pages", "totalPage", "total_page", "pages")
             val keys = value.keys()
-            while (keys.hasNext()) findTotalPages(value.opt(keys.next()), depth + 1)?.let { return it }
+            while (keys.hasNext()) {
+                val key = keys.next()
+                val nested = value.opt(key)
+                if (pageKeys.any { it.equals(key, ignoreCase = true) }) {
+                    val total = when (nested) {
+                        is Number -> nested.toInt()
+                        is String -> nested.toIntOrNull() ?: 0
+                        else -> 0
+                    }
+                    if (total > 0) return total
+                }
+                findTotalPages(nested, depth + 1)?.let { return it }
+            }
             return null
         }
-        val array = findBatchArray(response)
+        val array = findBatchArray(response) ?: emptyBatchArray
             ?: throw IllegalStateException("Batch server returned an unrecognized response")
         val batches = (0 until array.length()).mapNotNull { index ->
             val item = array.optJSONObject(index) ?: return@mapNotNull null
@@ -302,7 +327,8 @@ private class StudyApi(private val context: Context) {
             val thumbnail = previewImage ?: findImage(item).orEmpty()
             BatchInfo(id, item.optString("name", "Unnamed batch"), item.optString("lang", ""), item.optString("class", ""), thumbnail)
         }
-        return batches to (findTotalPages(response)?.coerceAtLeast(1) ?: 1)
+        // If the server omits pagination metadata, allow callers to scan pages until an empty page.
+        return batches to (findTotalPages(response)?.coerceAtLeast(1) ?: 50)
     }
 
     suspend fun generateKeyLink(): String {
@@ -1022,9 +1048,23 @@ private fun MineStudyApp() {
                         }.map { it.await() }.sortedBy { it.first }
                     }
                     if (generation != batchSearchGeneration) throw CancellationException()
+                    var stopPaging = false
                     for ((requestedPage, response) in pages) {
                         val (pageResults, reportedPages) = response
                         totalPages = reportedPages.coerceAtLeast(1)
+                        if (pageResults.isEmpty()) {
+                            stopPaging = true
+                            lastScannedPage = requestedPage
+                            scanned++
+                            break
+                        }
+                        val knownIds = accumulated.mapTo(HashSet()) { it.id }
+                        if (pageResults.all { it.id in knownIds }) {
+                            stopPaging = true
+                            lastScannedPage = requestedPage
+                            scanned++
+                            break
+                        }
                         val matches = if (query.isBlank()) pageResults else pageResults.filter { batchMatches(it, query) }
                         val previousSize = accumulated.size
                         accumulated = (accumulated + matches).distinctBy { it.id }
@@ -1037,6 +1077,7 @@ private fun MineStudyApp() {
                     batchSearchPage = lastScannedPage.coerceAtLeast(page)
                     batchSearchTotalPages = totalPages
                     batchSearchExecuted = true
+                    if (stopPaging) break
                     nextPage = groupEnd + 1
                 }
 
