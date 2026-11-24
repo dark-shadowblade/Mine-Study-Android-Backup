@@ -67,25 +67,3 @@ jobs:
           target_commitish: ${{ github.sha }}
           generate_release_notes: true
           files: app/build/outputs/apk/debug/app-debug.apk
-      - name: Authenticate with Firebase
-        if: ${{ env.FIREBASE_SERVICE_ACCOUNT != '' }}
-        id: firebase-auth
-        uses: google-github-actions/auth@v2
-        with:
-          credentials_json: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
-          token_format: access_token
-          access_token_scopes: https://www.googleapis.com/auth/firebase.messaging
-      - name: Send update push notification
-        if: ${{ env.FIREBASE_SERVICE_ACCOUNT != '' }}
-        env:
-          FIREBASE_ACCESS_TOKEN: ${{ steps.firebase-auth.outputs.access_token }}
-          VERSION_CODE: ${{ github.run_number }}
-          PROJECT_ID: mine-study-7b529
-        run: |
-          set -euo pipefail
-          curl --fail-with-body --silent --show-error \
-            -X POST \
-            -H "Authorization: Bearer $FIREBASE_ACCESS_TOKEN" \
-            -H "Content-Type: application/json; UTF-8" \
-            "https://fcm.googleapis.com/v1/projects/$PROJECT_ID/messages:send" \
-            -d "{\"message\":{\"topic\":\"mine_study_updates\",\"android\":{\"priority\":\"HIGH\"},\"data\":{\"versionCode\":\"$VERSION_CODE\",\"versionName\":\"1.0.$VERSION_CODE\"}}}"
