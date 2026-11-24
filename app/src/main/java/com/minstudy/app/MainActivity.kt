@@ -230,69 +230,12 @@ private class StudyApi(private val context: Context) {
             append("/batch/search/v2?cohortId=635b83410a47c70011ca5ffb&exam=UPSC&page=$page")
             if (keyword.isNotBlank()) append("&keyword=${enc(keyword)}")
         }
-        val response = get(query, unwrapData = false)
-        val batchIdKeys = setOf("_id", "id", "batchId", "batch_id", "batchID", "batch_id")
-        var emptyBatchArray: JSONArray? = null
-        fun hasBatchIdentity(item: JSONObject): Boolean {
-            val keys = item.keys()
-            while (keys.hasNext()) {
-                val key = keys.next()
-                if (batchIdKeys.any { it.equals(key, ignoreCase = true) } &&
-                    item.optString(key).isNotBlank() && item.optString(key) != "null") return true
-            }
-            return false
-        }
-        fun findBatchArray(value: Any?, depth: Int = 0): JSONArray? {
-            if (depth > 8) return null
-            if (value is JSONObject) {
-                val preferred = listOf("batches", "batchList", "batch_list", "results", "items", "docs")
-                for (key in preferred) {
-                    val nested = value.opt(key)
-                    if (nested is JSONArray && (0 until nested.length()).any { nested.optJSONObject(it)?.let(::hasBatchIdentity) == true }) return nested
-                    findBatchArray(nested, depth + 1)?.let { return it }
-                }
-                val keys = value.keys()
-                while (keys.hasNext()) {
-                    val nested = value.opt(keys.next())
-                    findBatchArray(nested, depth + 1)?.let { return it }
-                }
-            } else if (value is JSONArray) {
-                if (value.length() == 0) {
-                    if (emptyBatchArray == null) emptyBatchArray = value
-                } else if ((0 until value.length()).any { value.optJSONObject(it)?.let(::hasBatchIdentity) == true }) {
-                    return value
-                } else {
-                    for (index in 0 until value.length()) findBatchArray(value.opt(index), depth + 1)?.let { return it }
-                }
-            }
-            return null
-        }
-        fun findTotalPages(value: Any?, depth: Int = 0): Int? {
-            if (depth > 8 || value !is JSONObject) return null
-            val pageKeys = setOf("totalPages", "total_pages", "totalPage", "total_page", "pages")
-            val keys = value.keys()
-            while (keys.hasNext()) {
-                val key = keys.next()
-                val nested = value.opt(key)
-                if (pageKeys.any { it.equals(key, ignoreCase = true) }) {
-                    val total = when (nested) {
-                        is Number -> nested.toInt()
-                        is String -> nested.toIntOrNull() ?: 0
-                        else -> 0
-                    }
-                    if (total > 0) return total
-                }
-                findTotalPages(nested, depth + 1)?.let { return it }
-            }
-            return null
-        }
-        val array = findBatchArray(response) ?: emptyBatchArray
-            ?: throw IllegalStateException("Batch server returned an unrecognized response")
+        val payload = get(query, unwrapData = true) as? JSONObject
+            ?: throw IllegalStateException("Unexpected batch search response")
+        val array = payload.optJSONArray("batches") ?: JSONArray()
         val batches = (0 until array.length()).mapNotNull { index ->
             val item = array.optJSONObject(index) ?: return@mapNotNull null
-            val id = listOf("_id", "id", "batchId", "batch_id").firstNotNullOfOrNull { key ->
-                item.optString(key).takeIf { it.isNotBlank() && it != "null" }
-            } ?: return@mapNotNull null
+            val id = item.optString("_id").takeIf { it.isNotBlank() } ?: return@mapNotNull null
             // Batch search v2 exposes the official card artwork as previewImage.
             val previewImage = item.optString("previewImage").trim()
                 .takeIf { it.startsWith("https://", true) || it.startsWith("http://", true) }
@@ -329,8 +272,7 @@ private class StudyApi(private val context: Context) {
             val thumbnail = previewImage ?: findImage(item).orEmpty()
             BatchInfo(id, item.optString("name", "Unnamed batch"), item.optString("lang", ""), item.optString("class", ""), thumbnail)
         }
-        // If the server omits pagination metadata, allow callers to scan pages until an empty page.
-        return batches to (findTotalPages(response)?.coerceAtLeast(1) ?: 50)
+        return batches to (payload.optJSONObject("pagination")?.optInt("totalPages", 1)?.coerceAtLeast(1) ?: 1)
     }
 
     suspend fun generateKeyLink(): String {
