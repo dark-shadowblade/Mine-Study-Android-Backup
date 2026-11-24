@@ -1844,12 +1844,19 @@ private fun MineStudyApp(latestUpdateVersion: Long) {
     if (showSettings) {
         AlertDialog(
             onDismissRequest = { if (api.apiKey.isNotBlank()) showSettings = false },
-            shape = RoundedCornerShape(18.dp),
+            modifier = Modifier.padding(horizontal = 8.dp),
+            shape = RoundedCornerShape(16.dp),
             containerColor = Color(0xFF141A26),
             tonalElevation = 0.dp,
-            title = { Text("Connect API", fontWeight = FontWeight.SemiBold) },
+            title = {
+                Text("Connect API", fontWeight = FontWeight.SemiBold,
+                    style = MaterialTheme.typography.titleMedium)
+            },
             text = {
-                Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
+                Column(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 2.dp, vertical = 2.dp),
+                    verticalArrangement = Arrangement.spacedBy(7.dp)
+                ) {
                     OutlinedTextField(
                         value = apiKey,
                         onValueChange = { value ->
@@ -1857,9 +1864,10 @@ private fun MineStudyApp(latestUpdateVersion: Long) {
                             keyStatus = ""
                             api.batchId = batch
                         },
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier.fillMaxWidth().height(54.dp),
                         singleLine = true,
-                        textStyle = MaterialTheme.typography.bodyMedium,
+                        textStyle = MaterialTheme.typography.bodySmall,
+                        shape = RoundedCornerShape(10.dp),
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedTextColor = Color.White,
                             unfocusedTextColor = Color.White,
@@ -1869,7 +1877,7 @@ private fun MineStudyApp(latestUpdateVersion: Long) {
                             focusedContainerColor = Color(0xFF101521),
                             unfocusedContainerColor = Color(0xFF101521)
                         ),
-                        placeholder = { Text("Paste API key", style = MaterialTheme.typography.bodySmall) }
+                        placeholder = { Text("Paste API key", style = MaterialTheme.typography.labelSmall) }
                     )
                     OutlinedButton(
                         onClick = {
@@ -1886,12 +1894,12 @@ private fun MineStudyApp(latestUpdateVersion: Long) {
                                 }
                             }
                         },
-                        modifier = Modifier.fillMaxWidth(),
-                        contentPadding = PaddingValues(vertical = 7.dp)
+                        modifier = Modifier.fillMaxWidth().height(38.dp),
+                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp)
                     ) {
-                        Icon(Icons.Default.Key, null, modifier = Modifier.size(16.dp))
-                        Spacer(Modifier.width(6.dp))
-                        Text("Generate")
+                        Icon(Icons.Default.Key, null, modifier = Modifier.size(15.dp))
+                        Spacer(Modifier.width(5.dp))
+                        Text("Generate", style = MaterialTheme.typography.labelMedium)
                     }
                     if (keyStatus.isNotBlank()) {
                         Text(
@@ -1904,14 +1912,17 @@ private fun MineStudyApp(latestUpdateVersion: Long) {
             },
             confirmButton = {},
             dismissButton = {
-                TextButton(onClick = {
+                TextButton(
+                    onClick = {
                         downloadRecords = DownloadRepository.list(context)
                         showSettings = false
                         screen = "downloads"
-                    }) {
-                        Icon(Icons.Default.FolderOpen, null, modifier = Modifier.size(16.dp))
-                        Spacer(Modifier.width(6.dp))
-                        Text("Open Downloads")
+                    },
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
+                ) {
+                    Icon(Icons.Default.PlayArrow, null, modifier = Modifier.size(17.dp))
+                    Spacer(Modifier.width(5.dp))
+                    Text("Offline? Open Downloads", style = MaterialTheme.typography.labelMedium)
                 }
             }
         )
