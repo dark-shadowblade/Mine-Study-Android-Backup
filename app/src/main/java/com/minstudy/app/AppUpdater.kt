@@ -54,7 +54,7 @@ private data class AppRelease(
 )
 
 @Composable
-internal fun AutoUpdateChecker() {
+internal fun AutoUpdateChecker(onUpdateAvailable: (Long) -> Unit = {}) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var release by remember { mutableStateOf<AppRelease?>(null) }
@@ -63,7 +63,9 @@ internal fun AutoUpdateChecker() {
     var downloadedApk by remember { mutableStateOf<File?>(null) }
 
     LaunchedEffect(Unit) {
-        release = withContext(Dispatchers.IO) { findAppUpdate(context) }
+        val found = withContext(Dispatchers.IO) { findAppUpdate(context) }
+        release = found
+        if (found != null) onUpdateAvailable(found.versionCode)
     }
 
     val available = release ?: return
