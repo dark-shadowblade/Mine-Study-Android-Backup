@@ -1195,10 +1195,10 @@ private fun MineStudyApp(openUpdateSettings: Boolean, latestUpdateVersion: Long)
                             val downloadIconScale by downloadIconTransition.animateFloat(
                                 initialValue = 1f,
                                 targetValue = 1.18f,
-                                animationSpec = if (downloadingNow) androidx.compose.animation.core.infiniteRepeatable(
+                                animationSpec = androidx.compose.animation.core.infiniteRepeatable(
                                     animation = tween(650),
                                     repeatMode = androidx.compose.animation.core.RepeatMode.Reverse
-                                ) else androidx.compose.animation.core.snap(),
+                                ),
                                 label = "downloader-pulse"
                             )
                             IconButton(onClick = { screen = "download_center" }) {
