@@ -57,6 +57,7 @@ import androidx.compose.material.icons.filled.Fullscreen
 import androidx.compose.material.icons.filled.FullscreenExit
 import androidx.compose.material.icons.filled.Key
 import androidx.compose.material.icons.filled.MenuBook
+import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.Replay10
@@ -133,8 +134,9 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
-            MineStudyApp()
-            AutoUpdateChecker()
+            var latestUpdateVersion by remember { mutableLongStateOf(0L) }
+            MineStudyApp(latestUpdateVersion = latestUpdateVersion)
+            AutoUpdateChecker(onUpdateAvailable = { latestUpdateVersion = it })
         }
     }
 }
@@ -448,7 +450,7 @@ private class StudyApi(private val context: Context) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun MineStudyApp() {
+private fun MineStudyApp(latestUpdateVersion: Long) {
     val context = LocalContext.current
     val api = remember { StudyApi(context) }
     val scope = rememberCoroutineScope()
@@ -1168,6 +1170,18 @@ private fun MineStudyApp() {
                             }
                         },
                         actions = {
+                            IconButton(onClick = { screen = "notifications" }) {
+                                Box {
+                                    Icon(Icons.Default.Notifications, contentDescription = "Updates")
+                                    if (latestUpdateVersion > 0L) {
+                                        Box(
+                                            Modifier.align(Alignment.TopEnd)
+                                                .size(8.dp)
+                                                .background(Color(0xFFE53935), RoundedCornerShape(50))
+                                        )
+                                    }
+                                }
+                            }
                             val downloadingNow = downloadState.queueItems.any { it.active && !it.paused }
                             val downloadIconTransition = androidx.compose.animation.core.rememberInfiniteTransition(label = "downloader-icon")
                             val downloadIconScale by downloadIconTransition.animateFloat(
@@ -1777,6 +1791,23 @@ private fun MineStudyApp() {
                         PdfViewerScreen(uri, openedPdfTitle) {
                             screen = "downloads"
                             downloadRecords = DownloadRepository.list(context)
+                        }
+                    }
+                    "notifications" -> Column(
+                        modifier = Modifier.fillMaxWidth().padding(20.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Text("App update", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
+                        Text(
+                            if (latestUpdateVersion > 0L) "Please update Mine Study to the latest version."
+                            else "You're using the latest version.",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                        if (latestUpdateVersion > 0L) {
+                            Button(onClick = { screen = "settings" }, modifier = Modifier.fillMaxWidth()) {
+                                Text("Update now")
+                            }
                         }
                     }
                     "settings" -> UpdateSettingsScreen(
