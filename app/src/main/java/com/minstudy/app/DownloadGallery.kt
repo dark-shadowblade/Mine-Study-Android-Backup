@@ -532,7 +532,7 @@ fun DownloadCenterScreen(
         item {
             androidx.compose.foundation.layout.Row(Modifier.fillMaxWidth(), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
                 androidx.compose.foundation.layout.Column(Modifier.weight(1f)) {
-                    androidx.compose.material3.Text("Download queue", style = androidx.compose.material3.MaterialTheme.typography.titleLarge, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold)
+                    androidx.compose.material3.Text("Downloader", style = androidx.compose.material3.MaterialTheme.typography.titleLarge, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold)
                     androidx.compose.material3.Text("$runningCount active  ·  $queuedCount queued", style = androidx.compose.material3.MaterialTheme.typography.labelSmall, color = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant)
                 }
 
