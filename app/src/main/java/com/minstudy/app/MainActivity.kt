@@ -591,7 +591,7 @@ private fun MineStudyApp(latestUpdateVersion: Long) {
     // A newly pasted key is checked automatically. Existing saved keys do not
     // close Settings just because the user opened the dialog.
     LaunchedEffect(apiKey, batch, showSettings, screen) {
-        val settingsPage = screen == "api_key"
+        val settingsPage = screen == "settings"
         if ((showSettings || settingsPage) && apiKey.isNotBlank() && apiKey.trim() != api.apiKey.trim()) {
             keyStatus = "Verifying..."
             delay(500)
@@ -1129,7 +1129,6 @@ private fun MineStudyApp(latestUpdateVersion: Long) {
             "pdf" -> "downloads"
             "download_center" -> "home"
             "notifications" -> "home"
-            "api_key" -> "settings"
             "contents" -> "chapters"
             "chapters" -> "home"
             else -> "home"
@@ -1210,7 +1209,7 @@ private fun MineStudyApp(latestUpdateVersion: Long) {
                 }
             },
             bottomBar = {
-                if (screen in setOf("home", "all_batches", "my_batches", "downloads", "settings", "api_key")) {
+                if (screen in setOf("home", "all_batches", "my_batches", "downloads", "settings")) {
                     NavigationBar(
                         containerColor = Color(0xFF111622),
                         tonalElevation = 0.dp,
@@ -1249,7 +1248,7 @@ private fun MineStudyApp(latestUpdateVersion: Long) {
                             label = { Text("Downloads", maxLines = 1, fontSize = 10.sp) }
                         )
                         NavigationBarItem(
-                            selected = screen == "settings" || screen == "api_key",
+                            selected = screen == "settings",
                             onClick = { screen = "settings" },
                             icon = { Icon(Icons.Default.Settings, contentDescription = null) },
                             label = { Text("Settings", maxLines = 1, fontSize = 10.sp) }
@@ -1811,74 +1810,29 @@ private fun MineStudyApp(latestUpdateVersion: Long) {
                         }
                     }
                     "settings" -> UpdateSettingsScreen(
+                        apiKey = apiKey,
+                        keyStatus = keyStatus,
                         hasApiKey = api.apiKey.isNotBlank(),
-                        onManageApiKey = {
-                            apiKey = api.apiKey
+                        onApiKeyChange = { value ->
+                            apiKey = value
                             keyStatus = ""
-                            screen = "api_key"
+                            api.batchId = batch
+                        },
+                        onGenerateApiKey = {
+                            scope.launch {
+                                keyStatus = "Generating key link..."
+                                try {
+                                    keyLink = api.generateKeyLink()
+                                    val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                                    clipboard.setPrimaryClip(ClipData.newPlainText("Mine Study key link", keyLink))
+                                    keyStatus = "Link copied. Get your key and paste it above."
+                                    openExternal(context, keyLink)
+                                } catch (e: Exception) {
+                                    keyStatus = "Could not generate key. Check your connection."
+                                }
+                            }
                         }
                     )
-                    "api_key" -> {
-                        Column(
-                            Modifier.fillMaxWidth().padding(top = 14.dp),
-                            verticalArrangement = Arrangement.spacedBy(12.dp)
-                        ) {
-                            Text("API key", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
-                            OutlinedTextField(
-                                value = apiKey,
-                                onValueChange = { value ->
-                                    apiKey = value
-                                    keyStatus = ""
-                                    api.batchId = batch
-                                },
-                                modifier = Modifier.fillMaxWidth(),
-                                singleLine = true,
-                                shape = RoundedCornerShape(13.dp),
-                                textStyle = MaterialTheme.typography.bodyMedium,
-                                colors = OutlinedTextFieldDefaults.colors(
-                                    focusedTextColor = Color.White,
-                                    unfocusedTextColor = Color.White,
-                                    cursorColor = Color(0xFFB5A9FF),
-                                    focusedBorderColor = Color(0xFF9B8CFF),
-                                    unfocusedBorderColor = Color(0xFF343D50),
-                                    focusedContainerColor = Color(0xFF101521),
-                                    unfocusedContainerColor = Color(0xFF101521)
-                                ),
-                                placeholder = { Text("Paste API key") }
-                            )
-                            Button(
-                                onClick = {
-                                    scope.launch {
-                                        keyStatus = "Generating key link..."
-                                        try {
-                                            keyLink = api.generateKeyLink()
-                                            val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                                            clipboard.setPrimaryClip(ClipData.newPlainText("Mine Study key link", keyLink))
-                                            keyStatus = "Link copied. Get your key and paste it above."
-                                            openExternal(context, keyLink)
-                                        } catch (e: Exception) {
-                                            keyStatus = "Could not generate key. Check your connection."
-                                        }
-                                    }
-                                },
-                                enabled = !keyStatus.startsWith("Generating"),
-                                modifier = Modifier.fillMaxWidth().height(46.dp),
-                                shape = RoundedCornerShape(13.dp),
-                                contentPadding = PaddingValues(vertical = 8.dp)
-                            ) {
-                                Icon(Icons.Default.Key, null, modifier = Modifier.size(17.dp))
-                                Spacer(Modifier.width(7.dp))
-                                Text("Generate")
-                            }
-                            if (keyStatus.isNotBlank()) {
-                                Text(
-                                    keyStatus,
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = if (keyStatus == "Verified") Color(0xFF71D6C5) else Color(0xFF9AA5BA)
-                                )
-                            }
-                        }
-                    }
                 }
                 if (busy) LinearProgressIndicator(Modifier.fillMaxWidth().padding(top = 8.dp))
                     }
