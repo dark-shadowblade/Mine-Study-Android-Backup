@@ -1193,23 +1193,25 @@ private fun MineStudyApp(latestUpdateVersion: Long) {
                             )
                             IconButton(onClick = { screen = "download_center" }) {
                                 if (downloadingNow) {
-                                    Box(
-                                        modifier = Modifier.size(26.dp),
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        CircularProgressIndicator(
-                                            progress = { downloadFill },
-                                            modifier = Modifier.fillMaxSize(),
-                                            color = Color.White,
-                                            trackColor = Color(0xFF626875),
-                                            strokeWidth = 2.6.dp
-                                        )
-                                        Icon(
-                                            Icons.Default.Download,
-                                            contentDescription = "Downloader",
-                                            tint = Color.White,
-                                            modifier = Modifier.size(14.dp)
-                                        )
+                                    Canvas(modifier = Modifier.size(26.dp)) {
+                                        val diameter = size.minDimension
+                                        val center = Offset(size.width / 2f, size.height / 2f)
+                                        val baseRadius = diameter * 0.36f
+                                        // Three staggered, expanding rings recreate the supplied GIF's ripple.
+                                        repeat(3) { ring ->
+                                            val progress = (downloadFill + ring / 3f) % 1f
+                                            drawCircle(
+                                                color = Color(0xFFBEB8E8).copy(alpha = (1f - progress) * 0.72f),
+                                                radius = baseRadius + diameter * 0.14f * progress,
+                                                center = center,
+                                                style = androidx.compose.ui.graphics.drawscope.Stroke(width = diameter * 0.025f)
+                                            )
+                                        }
+                                        drawCircle(color = Color(0xFF17113F), radius = baseRadius, center = center)
+                                        val arrowStroke = diameter * 0.075f
+                                        drawLine(Color.White, Offset(center.x, center.y - diameter * 0.19f), Offset(center.x, center.y + diameter * 0.15f), arrowStroke, cap = StrokeCap.Round)
+                                        drawLine(Color.White, Offset(center.x - diameter * 0.14f, center.y + diameter * 0.01f), Offset(center.x, center.y + diameter * 0.16f), arrowStroke, cap = StrokeCap.Round)
+                                        drawLine(Color.White, Offset(center.x + diameter * 0.14f, center.y + diameter * 0.01f), Offset(center.x, center.y + diameter * 0.16f), arrowStroke, cap = StrokeCap.Round)
                                     }
                                 } else {
                                     Icon(
