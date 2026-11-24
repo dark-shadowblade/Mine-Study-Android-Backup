@@ -454,18 +454,42 @@ internal fun UpdateSettingsScreen(
                         strokeWidth = 2.dp,
                         color = androidx.compose.ui.graphics.Color(0xFFAAA2FF)
                     )
-                    verified -> Text(
-                        "✓",
-                        color = androidx.compose.ui.graphics.Color(0xFF38C879),
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = androidx.compose.ui.text.font.FontWeight.Bold
-                    )
-                    verificationFailed -> Text(
-                        "!",
-                        color = androidx.compose.ui.graphics.Color(0xFFFF6B6B),
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = androidx.compose.ui.text.font.FontWeight.Bold
-                    )
+                    verified || verificationFailed -> {
+                        val indicatorColor = if (verified)
+                            androidx.compose.ui.graphics.Color(0xFF2DA44E)
+                        else androidx.compose.ui.graphics.Color(0xFFCF222E)
+                        Row(
+                            modifier = Modifier.padding(end = 4.dp),
+                            horizontalArrangement = Arrangement.spacedBy(7.dp),
+                            verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
+                        ) {
+                            Text(
+                                if (verified) "Verified" else "Failed",
+                                color = indicatorColor,
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold
+                            )
+                            androidx.compose.material3.Surface(
+                                modifier = Modifier.size(22.dp),
+                                shape = androidx.compose.foundation.shape.CircleShape,
+                                color = indicatorColor.copy(alpha = 0.14f),
+                                border = androidx.compose.foundation.BorderStroke(
+                                    1.dp, indicatorColor
+                                )
+                            ) {
+                                androidx.compose.foundation.layout.Box(
+                                    contentAlignment = androidx.compose.ui.Alignment.Center
+                                ) {
+                                    Text(
+                                        if (verified) "✓" else "×",
+                                        color = indicatorColor,
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontWeight = androidx.compose.ui.text.font.FontWeight.Bold
+                                    )
+                                }
+                            }
+                        }
+                    }
                 }
             },
             colors = androidx.compose.material3.OutlinedTextFieldDefaults.colors(
@@ -488,14 +512,16 @@ internal fun UpdateSettingsScreen(
         }
         Text(
             "App version  ·  v$installedVersion",
-            style = MaterialTheme.typography.labelSmall,
+            style = MaterialTheme.typography.titleSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
 
         Text(
             status,
             style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+            color = if (status == "You're using the latest version.")
+                androidx.compose.ui.graphics.Color(0xFF2DA44E)
+            else androidx.compose.ui.graphics.Color(0xFFCF222E)
         )
         if (downloading) {
             LinearProgressIndicator(
