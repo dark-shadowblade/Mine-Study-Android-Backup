@@ -403,24 +403,25 @@ private class StudyApi(private val context: Context) {
     }
 
     fun list(value: Any?, kind: String): List<StudyItem> {
-        // Mine-Study request() returns json.data ?? json; each caller expects
-        // that exact payload to be an array.
-        val array = value as? JSONArray
-            ?: throw IllegalStateException("Unexpected API response: expected an array for $kind")
+        // The API may return the list directly or wrap it in an object
+        // (for example { subjects: [...] } or { data: { subjects: [...] } }).
+        // Resolve either shape instead of rejecting valid subject responses.
+        val array = value as? JSONArray ?: findArray(value)
+            ?: throw IllegalStateException("Unexpected API response: no $kind list was found")
 
         return (0 until array.length()).mapNotNull { i ->
             val obj = array.optJSONObject(i) ?: return@mapNotNull null
             val id = when (kind) {
-                "subjects" -> first(obj, "_id")
-                "chapters" -> first(obj, "chapter_id")
-                "contents" -> first(obj, "_id", "videoId", "id")
+                "subjects" -> first(obj, "_id", "id", "subjectId", "subject_id")
+                "chapters" -> first(obj, "chapter_id", "_id", "id", "chapterId")
+                "contents" -> first(obj, "_id", "videoId", "video_id", "id")
                 else -> null
             } ?: return@mapNotNull null
 
             val title = when (kind) {
-                "subjects" -> first(obj, "subject")
-                "chapters" -> first(obj, "name")
-                "contents" -> first(obj, "name", "topic")
+                "subjects" -> first(obj, "subject", "name", "title", "subjectName")
+                "chapters" -> first(obj, "name", "chapter", "title")
+                "contents" -> first(obj, "name", "topic", "title")
                 else -> null
             } ?: "Untitled"
             val subtitle = if (kind == "contents") {
