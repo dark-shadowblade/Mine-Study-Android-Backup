@@ -497,8 +497,7 @@ private fun MineStudyApp() {
     var screen by remember { mutableStateOf("home") }
     var type by remember { mutableStateOf("videos") }
     var subjects by remember { mutableStateOf(emptyList<StudyItem>()) }
-    var starredSubjectIds by remember(batch) {
-        mutableStateOf(progressPrefs.getStringSet("starred_subjects_$batch", emptySet())?.toSet() ?: emptySet())
+    var starredSubjectIds by remember(batch) {        mutableStateOf(progressPrefs.getStringSet("starred_subjects_$batch", emptySet())?.toSet() ?: emptySet())
     }
     fun toggleSubjectStar(subject: StudyItem) {
         val updated = if (subject.id in starredSubjectIds) starredSubjectIds - subject.id else starredSubjectIds + subject.id
@@ -997,8 +996,7 @@ private fun MineStudyApp() {
 
         // Page one always starts a fresh search; invalidate old responses.
         if (page == 1) {
-            batchSearchJob?.cancel()
-            batchSearchGeneration++
+            batchSearchJob?.cancel()            batchSearchGeneration++
             batchSearchResults = emptyList()
             batchSearchPage = 1
             batchSearchExecuted = false
@@ -1497,8 +1495,7 @@ private fun MineStudyApp() {
                             }
                         }
                     }
-                    "my_batches" -> {
-                        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    "my_batches" -> {                        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                             Column(Modifier.weight(1f)) {
                                 Text("My batches", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                                 Text("${savedBatchIds.size} saved ${if (savedBatchIds.size == 1) "batch" else "batches"}", color = Color.Gray, style = MaterialTheme.typography.bodySmall)
@@ -1997,8 +1994,7 @@ private fun ItemList(
                                     if (thumbnail != null) {
                                         AsyncImage(
                                             model = thumbnail,
-                                            contentDescription = item.title,
-                                            contentScale = ContentScale.Crop,
+                                            contentDescription = item.title,                                            contentScale = ContentScale.Crop,
                                             modifier = Modifier.fillMaxSize()
                                         )
                                     } else {
@@ -2263,7 +2259,7 @@ private fun VideoScreen(
     DisposableEffect(fullScreen) {
         val window = activity?.window
         if (fullScreen) {
-            activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_REVERSE_PORTRAIT
+            activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_REVERSE_LANDSCAPE
             if (window != null) WindowInsetsControllerCompat(window, window.decorView).hide(WindowInsetsCompat.Type.systemBars())
         } else {
             activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
@@ -2497,8 +2493,7 @@ private fun VideoScreen(
                                     )
                                 }
                         ) {
-                            val centerY = size.height / 2f
-                            val fraction = volume.toFloat() / maxVolume.toFloat()
+                            val centerY = size.height / 2f                            val fraction = volume.toFloat() / maxVolume.toFloat()
                             val endX = size.width * fraction
                             drawLine(Color.White.copy(alpha = 0.32f), Offset(0f, centerY), Offset(size.width, centerY), 2.dp.toPx(), cap = StrokeCap.Round)
                             drawLine(Color.White, Offset(0f, centerY), Offset(endX, centerY), 2.dp.toPx(), cap = StrokeCap.Round)
@@ -2658,7 +2653,7 @@ private fun VideoScreen(
             if (controlsLocked) {
                 Text("Tap to unlock", color = Color.White, modifier = Modifier.align(Alignment.Center)
                     .background(Color(0xAA000000), RoundedCornerShape(18.dp)).padding(horizontal = 16.dp, vertical = 9.dp))
-            } else if (showControls) PlayerOverlay(landscape = false, fullScreenMode = true)
+            } else if (showControls) PlayerOverlay(landscape = true, fullScreenMode = true)
             if (showResources) {
                 Box(Modifier.fillMaxSize().background(Color(0x99000000)).clickable { showResources = false }) {
                     Card(
@@ -2997,8 +2992,7 @@ private fun openLocalDocument(context: Context, uri: Uri) {
 private fun openExternal(context: Context, value: String) {
     try { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(value)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) } catch (_: Exception) { }
 }
-private fun downloadVideo(context: Context, url: String, key: String, title: String) {
-    kotlinx.coroutines.CoroutineScope(Dispatchers.IO).launch {
+private fun downloadVideo(context: Context, url: String, key: String, title: String) {    kotlinx.coroutines.CoroutineScope(Dispatchers.IO).launch {
         var mediaUri: Uri? = null
         try {
             val safeName = title.replace(Regex("[^A-Za-z0-9._-]"), "_").ifBlank { "MineStudy_Lecture" } + ".mp4"
