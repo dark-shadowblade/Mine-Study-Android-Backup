@@ -540,6 +540,8 @@ private fun MineStudyApp(openUpdateSettings: Boolean, latestUpdateVersion: Long)
     var keyLink by remember { mutableStateOf("") }
     var keyStatus by remember { mutableStateOf("") }
     var showSettings by remember { mutableStateOf(apiKey.isBlank()) }
+    // Keep the first-run API popup distinct from the Settings > Manage API key dialog.
+    var apiKeyDialogFromSettings by remember { mutableStateOf(false) }
     var downloadRecords by remember { mutableStateOf(DownloadRepository.list(context)) }
     var openedPdfUri by remember { mutableStateOf<Uri?>(null) }
     var openedPdfTitle by remember { mutableStateOf("") }
@@ -1807,6 +1809,7 @@ private fun MineStudyApp(openUpdateSettings: Boolean, latestUpdateVersion: Long)
                         onManageApiKey = {
                             apiKey = api.apiKey
                             keyStatus = ""
+                            apiKeyDialogFromSettings = true
                             showSettings = true
                         }
                     )
@@ -1882,9 +1885,26 @@ private fun MineStudyApp(openUpdateSettings: Boolean, latestUpdateVersion: Long)
             },
             confirmButton = {},
             dismissButton = {
-                if (api.apiKey.isNotBlank()) {
-                    TextButton(onClick = { showSettings = false }) {
-                        Text("Done")
+                if (apiKeyDialogFromSettings) {
+                    if (api.apiKey.isNotBlank()) {
+                        TextButton(onClick = {
+                            showSettings = false
+                            apiKeyDialogFromSettings = false
+                        }) {
+                            Text("Done")
+                        }
+                    }
+                } else {
+                    // Preserve the original first-run popup action; the compact
+                    // Settings-only layout must not change this popup.
+                    TextButton(onClick = {
+                        downloadRecords = DownloadRepository.list(context)
+                        showSettings = false
+                        screen = "downloads"
+                    }) {
+                        Icon(Icons.Default.FolderOpen, null, modifier = Modifier.size(16.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text("Open Downloads")
                     }
                 }
             }
