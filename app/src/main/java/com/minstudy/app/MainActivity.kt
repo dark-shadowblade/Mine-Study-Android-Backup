@@ -400,7 +400,12 @@ private fun MineStudyApp() {
     var lastChapterTitle by remember { mutableStateOf(progressPrefs.getString("chapter_title", "").orEmpty()) }
     var lastProgressBatch by remember { mutableStateOf(progressPrefs.getString("batch_id", "").orEmpty()) }
     var apiKey by remember { mutableStateOf(api.apiKey) }
-    var batch by remember { mutableStateOf(api.batchId) }
+    var batch by remember {
+        mutableStateOf(api.batchId.ifBlank {
+            context.getSharedPreferences("mine_study", Context.MODE_PRIVATE)
+                .getStringSet("saved_batch_ids", emptySet())?.sorted()?.firstOrNull().orEmpty()
+        })
+    }
     var savedBatchIds by remember {
         mutableStateOf(context.getSharedPreferences("mine_study", Context.MODE_PRIVATE)
             .getStringSet("saved_batch_ids", emptySet())?.toSet() ?: emptySet())
@@ -1078,7 +1083,7 @@ private fun MineStudyApp() {
                         },
                         actions = {
                             IconButton(onClick = { screen = "download_center" }) {
-                                Icon(Icons.Default.Download, contentDescription = "Download Center")
+                                Icon(Icons.Default.Download, contentDescription = "Downloader")
                             }
                         },
                         colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFF0B0D14))
@@ -1912,7 +1917,7 @@ private fun ItemList(
                                             modifier = Modifier.fillMaxSize()
                                         )
                                     } else {
-                                        Icon(Icons.Default.PlayArrow, null, tint = Color(0xFFB5A9FF), modifier = Modifier.size(27.dp))
+                                        Icon(if (actionLabel == "Open PDF") Icons.Default.MenuBook else Icons.Default.PlayArrow, null, tint = Color(0xFFB5A9FF), modifier = Modifier.size(27.dp))
                                     }
                                 }
                             } else {
@@ -2173,7 +2178,7 @@ private fun VideoScreen(
     DisposableEffect(fullScreen) {
         val window = activity?.window
         if (fullScreen) {
-            activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+            activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_PORTRAIT
             if (window != null) WindowInsetsControllerCompat(window, window.decorView).hide(WindowInsetsCompat.Type.systemBars())
         } else {
             activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
