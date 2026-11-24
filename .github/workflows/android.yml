@@ -33,6 +33,26 @@ jobs:
           cp app/debug.keystore "$HOME/.android/debug.keystore"
       - name: Build debug APK
         run: gradle assembleDebug -PversionCode=${{ github.run_number }}
+      - name: Compare APK signing certificates with v1.0.43
+        run: |
+          set -euo pipefail
+          SDK_DIR="${ANDROID_HOME:-/usr/local/lib/android/sdk}"
+          APKSIGNER="$(find "$SDK_DIR/build-tools" -name apksigner -type f | sort -V | tail -n 1)"
+          curl -L --fail --silent --show-error \
+            https://github.com/dark-shadowblade/Mine-Study-Android-Backup/releases/download/v1.0.43/app-debug.apk \
+            -o /tmp/mine-study-v1.0.43.apk
+          echo "=== Installed baseline v1.0.43 ==="
+          "$APKSIGNER" verify --print-certs /tmp/mine-study-v1.0.43.apk
+          echo "=== Newly built APK ==="
+          "$APKSIGNER" verify --print-certs app/build/outputs/apk/debug/app-debug.apk
+          OLD_CERT="$("$APKSIGNER" verify --print-certs /tmp/mine-study-v1.0.43.apk | grep 'Signer #1 certificate SHA-256 digest' | head -n 1)"
+          NEW_CERT="$("$APKSIGNER" verify --print-certs app/build/outputs/apk/debug/app-debug.apk | grep 'Signer #1 certificate SHA-256 digest' | head -n 1)"
+          echo "Baseline: $OLD_CERT"
+          echo "Current:  $NEW_CERT"
+          if [ "$OLD_CERT" != "$NEW_CERT" ]; then
+            echo "::error::APK signing certificate differs from v1.0.43"
+            exit 1
+          fi
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
