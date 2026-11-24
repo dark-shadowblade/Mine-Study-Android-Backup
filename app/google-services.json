@@ -1,0 +1,28 @@
+{
+  "project_info": {
+    "project_number": "989471035746",
+    "project_id": "mine-study-7b529",
+    "storage_bucket": "mine-study-7b529.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:989471035746:android:4fe45155fe174b33535c3b",
+        "android_client_info": {
+          "package_name": "com.minstudy.app"
+        }
+      },
+      "api_key": [
+        {
+          "current_key": "AIzaSyCHa2MR1Ted-GO4zshMtD_MxjoWTTZ607Q"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
