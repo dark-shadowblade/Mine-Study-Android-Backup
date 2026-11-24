@@ -350,3 +350,91 @@ private fun installDownloadedUpdate(context: Context, apk: File) {
         ).show()
     }
 }
+
+
+@Composable
+internal fun UpdateSettingsScreen() {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val installedVersion = remember {
+        runCatching { context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: "Unknown" }
+            .getOrDefault("Unknown")
+    }
+    var checking by remember { mutableStateOf(false) }
+    var downloading by remember { mutableStateOf(false) }
+    var progress by remember { mutableFloatStateOf(0f) }
+    var latest by remember { mutableStateOf<AppRelease?>(null) }
+    var apk by remember { mutableStateOf<File?>(null) }
+    var status by remember { mutableStateOf("Check for updates to see if a new version is available.") }
+
+    Column(
+        modifier = Modifier.fillMaxSize().padding(top = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        Text("Settings", style = MaterialTheme.typography.headlineSmall, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold)
+        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text("App version", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text("v$installedVersion", style = MaterialTheme.typography.titleLarge, fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold)
+        }
+        Text(status, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        if (checking || downloading) {
+            LinearProgressIndicator(
+                progress = { if (downloading) progress else 0f },
+                modifier = Modifier.fillMaxWidth()
+            )
+            if (downloading) Text("${(progress * 100).toInt()}%")
+        }
+        Button(
+            enabled = !checking && !downloading,
+            onClick = {
+                checking = true
+                latest = null
+                apk = null
+                status = "Checking for updates…"
+                scope.launch {
+                    val result = withContext(Dispatchers.IO) { findAppUpdate(context) }
+                    latest = result
+                    status = if (result == null) "You're using the latest version." else "Update available: v${result.versionName}"
+                    checking = false
+                }
+            },
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            if (checking) CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
+            else Text("Check for updates")
+        }
+        if (latest != null) {
+            Button(
+                enabled = !downloading,
+                onClick = {
+                    val release = latest ?: return@Button
+                    downloading = true
+                    progress = 0f
+                    status = "Downloading v${release.versionName}…"
+                    scope.launch {
+                        try {
+                            apk = downloadUpdate(release.apkUrl, context, release.versionCode) { progress = it }
+                            status = "Update downloaded. Ready to install."
+                        } catch (error: Exception) {
+                            apk = null
+                            status = if (error.message?.contains("signing certificate") == true)
+                                "This update is signed differently and can't replace this installation."
+                            else "Update download failed."
+                        } finally {
+                            downloading = false
+                        }
+                    }
+                },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(if (apk?.exists() == true) "Download again" else "Download update")
+            }
+        }
+        if (apk?.isFile == true) {
+            Button(
+                onClick = { apk?.let { installDownloadedUpdate(context, it) } },
+                modifier = Modifier.fillMaxWidth()
+            ) { Text("Install update") }
+        }
+    }
+}
