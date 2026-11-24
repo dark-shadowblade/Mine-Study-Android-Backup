@@ -1603,6 +1603,10 @@ private fun MineStudyApp() {
                             downloadingKeys = pendingDownloadKeys + downloadState.queueItems.map { it.itemKey }.filter { it.isNotBlank() }.toSet(),
                             downloadQueueItems = downloadState.queueItems,
                             onDownload = { item: StudyItem ->
+                                // Freeze the selected lesson identity before asynchronous URL lookup.
+                                val requestedBatch = api.batchId
+                                val requestedSubject = selectedSubject?.id.orEmpty()
+                                val requestedChapter = selectedChapter?.id.orEmpty()
                                 val video = type == "videos" || type == "DppVideos"
                                 val category = when (type) {
                                     "videos" -> "Lectures"
@@ -1611,13 +1615,17 @@ private fun MineStudyApp() {
                                     "DppVideos" -> "DPP Videos"
                                     else -> type
                                 }
-                                val itemKey = "${api.batchId}:${selectedSubject?.id}:${selectedChapter?.id}:${item.id}"
+                                val itemKey = "$requestedBatch:$requestedSubject:$requestedChapter:${item.id}"
+                                val sourceItem = item
                                 startDownload(item.title, category, video, itemKey) {
                                     if (video) {
-                                        val detailPath = "/batch/" + api.batchId + "/subject/" + enc(selectedSubject!!.id) +
-                                            "/chapter/" + enc(selectedChapter!!.id) + "/content/" + enc(item.id)
+                                        if (requestedSubject.isBlank() || requestedChapter.isBlank()) {
+                                            throw IllegalStateException("Lesson selection changed before download started")
+                                        }
+                                        val detailPath = "/batch/" + requestedBatch + "/subject/" + enc(requestedSubject) +
+                                            "/chapter/" + enc(requestedChapter) + "/content/" + enc(sourceItem.id)
                                         findStreamUrl(api.get(detailPath))
-                                    } else item.raw.optString("baseUrl").takeIf { it.startsWith("http", true) }
+                                    } else sourceItem.raw.optString("baseUrl").takeIf { it.startsWith("http", true) }
                                 }
                             },
                             onSelect = { item: StudyItem ->
@@ -1689,9 +1697,16 @@ private fun MineStudyApp() {
                                 it.category == (if (type == "DppVideos") "DPP Videos" else "Lectures")
                         } || (pendingDownloadKey == "${api.batchId}:${selectedSubject?.id}:${selectedChapter?.id}:${contents.getOrNull(currentItemIndex)?.id}"),
                         onDownload = {
+                            // Keep the source fixed even if navigation changes the selected video.
+                            val sourceUrl = currentVideo
+                            val title = currentTitle
+                            val requestedBatch = api.batchId
+                            val requestedSubject = selectedSubject?.id.orEmpty()
+                            val requestedChapter = selectedChapter?.id.orEmpty()
+                            val requestedItem = contents.getOrNull(currentItemIndex)?.id.orEmpty()
                             val category = if (type == "DppVideos") "DPP Videos" else "Lectures"
-                            val itemKey = "${api.batchId}:${selectedSubject?.id}:${selectedChapter?.id}:${contents.getOrNull(currentItemIndex)?.id}"
-                            startDownload(currentTitle, category, true, itemKey) { currentVideo }
+                            val itemKey = "$requestedBatch:$requestedSubject:$requestedChapter:$requestedItem"
+                            startDownload(title, category, true, itemKey) { sourceUrl }
                         }
                     )
                     "download_center" -> DownloadCenterScreen(
