@@ -436,7 +436,10 @@ private fun installDownloadedUpdate(context: Context, apk: File) {
 
 
 @Composable
-internal fun UpdateSettingsScreen() {
+internal fun UpdateSettingsScreen(
+    hasApiKey: Boolean,
+    onManageApiKey: () -> Unit
+) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val installedVersion = remember {
@@ -458,6 +461,23 @@ internal fun UpdateSettingsScreen() {
         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text("App version", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Text("v$installedVersion", style = MaterialTheme.typography.titleLarge, fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold)
+        }
+        Column(
+            modifier = Modifier.fillMaxWidth()
+                .padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Text("Batch API", style = MaterialTheme.typography.titleMedium,
+                fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold)
+            Text(
+                if (hasApiKey) "An API key is saved. Keys expire after 24 hours; replace it whenever needed."
+                else "Add an API key to load batches, subjects and lectures.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Button(onClick = onManageApiKey, modifier = Modifier.fillMaxWidth()) {
+                Text(if (hasApiKey) "Manage API key" else "Add API key")
+            }
         }
         Text(status, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         if (checking || downloading) {
