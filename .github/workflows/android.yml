@@ -27,41 +27,25 @@ jobs:
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
-      - name: Configure stable app signing key
-        run: |
-          mkdir -p "$HOME/.android"
-          cp app/debug.keystore "$HOME/.android/debug.keystore"
-      - name: Inspect stable signing key
+      - name: Verify permanent signing key
         run: |
           set -euo pipefail
-          echo "=== Repository keystore ==="
-          keytool -list -v -keystore app/debug.keystore -storepass android
-          echo "=== Android debug keystore ==="
-          keytool -list -v -keystore "$HOME/.android/debug.keystore" -storepass android
-          echo "=== Earlier repository keystore candidate ==="
-          git fetch --no-tags origin bf7a061782301ef07816ef256f865c10c1dac004
-          git show bf7a061782301ef07816ef256f865c10c1dac004:app/debug.keystore > /tmp/earlier-debug.keystore
-          keytool -list -v -keystore /tmp/earlier-debug.keystore -storepass android
+          test -s app/debug.keystore
+          keytool -list -v -keystore app/debug.keystore -storepass android -alias androiddebugkey
       - name: Build debug APK
-        run: gradle assembleDebug -PversionCode=${{ github.run_number }}
-      - name: Compare APK signing certificates with v1.0.43
+        run: gradle --no-build-cache assembleDebug -PversionCode=${{ github.run_number }}
+      - name: Enforce permanent APK signing certificate
         run: |
           set -euo pipefail
           SDK_DIR="${ANDROID_HOME:-/usr/local/lib/android/sdk}"
           APKSIGNER="$(find "$SDK_DIR/build-tools" -name apksigner -type f | sort -V | tail -n 1)"
-          curl -L --fail --silent --show-error \
-            https://github.com/dark-shadowblade/Mine-Study-Android-Backup/releases/download/v1.0.43/app-debug.apk \
-            -o /tmp/mine-study-v1.0.43.apk
-          echo "=== Installed baseline v1.0.43 ==="
-          "$APKSIGNER" verify --print-certs /tmp/mine-study-v1.0.43.apk
-          echo "=== Newly built APK ==="
-          "$APKSIGNER" verify --print-certs app/build/outputs/apk/debug/app-debug.apk
-          OLD_CERT="$("$APKSIGNER" verify --print-certs /tmp/mine-study-v1.0.43.apk | grep 'Signer #1 certificate SHA-256 digest' | head -n 1)"
-          NEW_CERT="$("$APKSIGNER" verify --print-certs app/build/outputs/apk/debug/app-debug.apk | grep 'Signer #1 certificate SHA-256 digest' | head -n 1)"
-          echo "Baseline: $OLD_CERT"
-          echo "Current:  $NEW_CERT"
-          if [ "$OLD_CERT" != "$NEW_CERT" ]; then
-            echo "::error::APK signing certificate differs from v1.0.43"
+          APK="app/build/outputs/apk/debug/app-debug.apk"
+          EXPECTED_CERT="0d927c1457f4f691cbc0ce35aa5882fca1fee1e06534c1a5b3f41f85021c2d81"
+          ACTUAL_CERT="$("$APKSIGNER" verify --print-certs "$APK" | awk -F': ' '/Signer #1 certificate SHA-256 digest/ {print $2; exit}')"
+          echo "Expected signing certificate: $EXPECTED_CERT"
+          echo "Built APK certificate:       $ACTUAL_CERT"
+          if [ "$ACTUAL_CERT" != "$EXPECTED_CERT" ]; then
+            echo "::error::Signing certificate changed. Release blocked to prevent breaking app updates."
             exit 1
           fi
       - name: Upload APK artifact
