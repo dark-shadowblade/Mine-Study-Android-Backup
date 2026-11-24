@@ -1801,7 +1801,7 @@ private fun MineStudyApp(openUpdateSettings: Boolean, latestUpdateVersion: Long)
                             downloadRecords = DownloadRepository.list(context)
                         }
                     }
-                    "settings" -> UpdateSettingsScreen()
+                    "settings" -> UpdateSettingsScreen(\n                        hasApiKey = api.apiKey.isNotBlank(),\n                        onManageApiKey = {\n                            apiKey = api.apiKey\n                            keyStatus = ""\n                            showSettings = true\n                        }\n                    )
                     "notifications" -> NotificationsScreen(onOpenSettings = { screen = "settings" })
                 }
                 if (busy) LinearProgressIndicator(Modifier.fillMaxWidth().padding(top = 8.dp))
