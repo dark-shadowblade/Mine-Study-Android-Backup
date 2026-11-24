@@ -979,9 +979,10 @@ private fun MineStudyApp() {
 
                 // The API ignores keyword, so match locally. Two requests at
                 // a time reduce rate limiting; each load remains bounded.
-                val pageBudget = if (query.isBlank()) 8 else 50
-                while (nextPage <= totalPages && scanned < pageBudget &&
-                    (query.isBlank() || newMatches < 20)) {
+                // Search every available page: common terms can match many
+                // early batches, so stopping after 20 matches hides later results.
+                val pageBudget = if (query.isBlank()) 8 else totalPages
+                while (nextPage <= totalPages && scanned < pageBudget) {
                     val groupEnd = minOf(nextPage + 1, totalPages, page + pageBudget - 1)
                     val pages = coroutineScope {
                         (nextPage..groupEnd).map { requestedPage ->
