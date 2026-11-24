@@ -874,6 +874,11 @@ private fun MineStudyApp() {
     }
 
     fun saveBatchInfo(info: BatchInfo) {
+        // The first batch added becomes the default batch automatically.
+        if (batch.isBlank()) {
+            batch = info.id
+            api.batchId = info.id
+        }
         val updated = savedBatchIds + info.id
         savedBatchIds = updated
         val updatedInfo = savedBatchInfo + (info.id to info)
@@ -911,7 +916,9 @@ private fun MineStudyApp() {
             return
         }
         val existing = savedBatchInfo[id] ?: BatchInfo(id, "Manual batch")
+        val isFirstBatch = batch.isBlank()
         saveBatchInfo(existing)
+        if (isFirstBatch) openBatch(existing)
         manualBatchId = ""
         batchSearchError = ""
         Toast.makeText(context, "Batch added to My batches", Toast.LENGTH_SHORT).show()
@@ -1463,7 +1470,11 @@ private fun MineStudyApp() {
                                         }
                                         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
                                             OutlinedButton(
-                                                onClick = { saveBatchInfo(info) },
+                                                onClick = {
+                                                    val isFirstBatch = batch.isBlank()
+                                                    saveBatchInfo(info)
+                                                    if (isFirstBatch) openBatch(info)
+                                                },
                                                 enabled = info.id !in savedBatchIds,
                                                 modifier = Modifier.weight(1f).height(46.dp),
                                                 shape = RoundedCornerShape(12.dp),
@@ -2477,10 +2488,22 @@ private fun VideoScreen(
                         modifier = Modifier.clip(RoundedCornerShape(4.dp)).clickable { showRemainingTime = !showRemainingTime }.padding(horizontal = 3.dp, vertical = 2.dp)
                     )
                     Spacer(Modifier.weight(1f))
-                    IconButton(onClick = { volumePanel = !volumePanel }, modifier = Modifier.size(32.dp)) {
+                    IconButton(
+                        onClick = {
+                            if (volume > 0) {
+                                previousVolume = volume
+                                volume = 0
+                            } else {
+                                volume = previousVolume.coerceIn(1, maxVolume)
+                            }
+                            audio.setStreamVolume(AudioManager.STREAM_MUSIC, volume, 0)
+                            volumePanel = true
+                        },
+                        modifier = Modifier.size(32.dp)
+                    ) {
                         Icon(
                             when { volume == 0 -> Icons.Default.VolumeMute; volume < maxVolume / 2 -> Icons.Default.VolumeDown; else -> Icons.Default.VolumeUp },
-                            "Mute or restore volume", tint = Color.White, modifier = Modifier.size(19.dp)
+                            if (volume == 0) "Unmute" else "Mute", tint = Color.White, modifier = Modifier.size(19.dp)
                         )
                     }
                     if (volumePanel) {
@@ -2631,7 +2654,7 @@ private fun VideoScreen(
                             )
                         }.pointerInput(player, controlsLocked) {
             detectTapGestures(
-                onTap = { if (controlsLocked) { controlsLocked = false; showControls = true } else showControls = !showControls },
+                onTap = { if (!controlsLocked) showControls = !showControls },
                 onDoubleTap = { offset ->
                     if (!controlsLocked) {
                         val delta = if (offset.x < size.width / 2f) -10_000L else 10_000L
@@ -2668,8 +2691,16 @@ private fun VideoScreen(
                 }
             }
             if (controlsLocked) {
-                Text("Tap to unlock", color = Color.White, modifier = Modifier.align(Alignment.Center)
-                    .background(Color(0xAA000000), RoundedCornerShape(18.dp)).padding(horizontal = 16.dp, vertical = 9.dp))
+                Column(
+                    modifier = Modifier.align(Alignment.Center)
+                        .background(Color(0xAA000000), RoundedCornerShape(18.dp))
+                        .clickable { controlsLocked = false; showControls = true }
+                        .padding(horizontal = 16.dp, vertical = 10.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Icon(Icons.Default.LockOpen, contentDescription = "Unlock controls", tint = Color.White)
+                    Text("Unlock", color = Color.White, style = MaterialTheme.typography.labelMedium)
+                }
             } else if (showControls) PlayerOverlay(landscape = true, fullScreenMode = true)
             if (showResources) {
                 Box(Modifier.fillMaxSize().background(Color(0x99000000)).clickable { showResources = false }) {
@@ -2765,7 +2796,7 @@ private fun VideoScreen(
                                     )
                                 }.pointerInput(player, controlsLocked) {
                         detectTapGestures(
-                            onTap = { if (controlsLocked) { controlsLocked = false; showControls = true } else showControls = !showControls },
+                            onTap = { if (!controlsLocked) showControls = !showControls },
                             onDoubleTap = { offset ->
                                 if (!controlsLocked) {
                                     val delta = if (offset.x < size.width / 2f) -10_000L else 10_000L
@@ -2803,9 +2834,17 @@ private fun VideoScreen(
                 }
             }
             if (controlsLocked) {
-                    Text("Tap to unlock", color = Color.White, modifier = Modifier.align(Alignment.Center)
-                        .background(Color(0xAA000000), RoundedCornerShape(18.dp)).padding(horizontal = 14.dp, vertical = 8.dp))
-                } else if (showControls) PlayerOverlay(landscape = false)
+                Column(
+                    modifier = Modifier.align(Alignment.Center)
+                        .background(Color(0xAA000000), RoundedCornerShape(18.dp))
+                        .clickable { controlsLocked = false; showControls = true }
+                        .padding(horizontal = 14.dp, vertical = 8.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Icon(Icons.Default.LockOpen, contentDescription = "Unlock controls", tint = Color.White)
+                    Text("Unlock", color = Color.White, style = MaterialTheme.typography.labelSmall)
+                }
+            } else if (showControls) PlayerOverlay(landscape = false)
                 if (playerError.isNotBlank()) {
                     TextButton(onClick = { playerError = ""; player.prepare(); player.play() }, modifier = Modifier.align(Alignment.TopEnd)) {
                         Text("Retry", color = Color.White)
