@@ -1160,8 +1160,7 @@ private fun MineStudyApp(latestUpdateVersion: Long) {
                 if (screen != "player") {
                     TopAppBar(
                         title = { Column {
-                            Text("MINE STUDY", fontWeight = FontWeight.Black, letterSpacing = 2.sp)
-                            Text("Your learning space", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text("Abhi's PW", fontWeight = FontWeight.Black, letterSpacing = 1.5.sp)
                         } },
                         navigationIcon = {
                             if (screen != "home") IconButton(onClick = { goBack() }) {
