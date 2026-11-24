@@ -1431,7 +1431,7 @@ private fun MineStudyApp() {
                         Text("Use this if a batch isn't listed in All batches.", color = Color.Gray, style = MaterialTheme.typography.bodySmall)
                         Spacer(Modifier.height(10.dp))
                         LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp), contentPadding = PaddingValues(bottom = 16.dp)) {
-                            items(savedBatchIds.sorted(), key = { it }) { id ->
+                            items(savedBatchIds.sortedWith(compareByDescending<String> { it == batch }.thenBy { savedBatchInfo[it]?.name?.lowercase() ?: it }), key = { it }) { id ->
                                 val info = savedBatchInfo[id] ?: BatchInfo(id, "Saved batch")
                                 Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = Color(0xFF171D2A)), shape = RoundedCornerShape(18.dp)) {
                                     Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -1450,8 +1450,16 @@ private fun MineStudyApp() {
                                             }
                                         }
                                         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                            Button(onClick = { openBatch(info) }, enabled = !busy, modifier = Modifier.weight(1f), shape = RoundedCornerShape(12.dp)) {
-                                                Text(if (batch == id) "Open batch" else "Check & switch")
+                                            if (batch == id) {
+                                                FilledTonalButton(onClick = {}, enabled = false, modifier = Modifier.weight(1f), shape = RoundedCornerShape(12.dp)) {
+                                                    Icon(Icons.Default.CheckCircle, null, modifier = Modifier.size(17.dp))
+                                                    Spacer(Modifier.width(6.dp))
+                                                    Text("Selected")
+                                                }
+                                            } else {
+                                                OutlinedButton(onClick = { openBatch(info) }, enabled = !busy, modifier = Modifier.weight(1f), shape = RoundedCornerShape(12.dp)) {
+                                                    Text("Select")
+                                                }
                                             }
                                             OutlinedButton(onClick = { batchPendingRemoval = id }, modifier = Modifier.weight(1f), shape = RoundedCornerShape(12.dp), colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFFFF8A8A))) {
                                                 Icon(Icons.Default.DeleteOutline, null, modifier = Modifier.size(18.dp))
@@ -2153,7 +2161,7 @@ private fun VideoScreen(
     DisposableEffect(fullScreen) {
         val window = activity?.window
         if (fullScreen) {
-            activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_PORTRAIT
+            activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
             if (window != null) WindowInsetsControllerCompat(window, window.decorView).hide(WindowInsetsCompat.Type.systemBars())
         } else {
             activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
