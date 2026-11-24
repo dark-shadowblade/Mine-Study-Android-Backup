@@ -38,6 +38,10 @@ jobs:
           keytool -list -v -keystore app/debug.keystore -storepass android
           echo "=== Android debug keystore ==="
           keytool -list -v -keystore "$HOME/.android/debug.keystore" -storepass android
+          echo "=== Earlier repository keystore candidate ==="
+          git fetch --no-tags origin bf7a061782301ef07816ef256f865c10c1dac004
+          git show bf7a061782301ef07816ef256f865c10c1dac004:app/debug.keystore > /tmp/earlier-debug.keystore
+          keytool -list -v -keystore /tmp/earlier-debug.keystore -storepass android
       - name: Build debug APK
         run: gradle assembleDebug -PversionCode=${{ github.run_number }}
       - name: Compare APK signing certificates with v1.0.43
