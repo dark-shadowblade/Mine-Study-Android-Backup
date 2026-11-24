@@ -233,7 +233,7 @@ fun DownloadGallery(
     var selectedUris by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(setOf<String>()) }
     var selectionMode by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
     var confirmDelete by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf("") }
-    val categories = listOf("Lectures", "Notes", "DPP", "DPP Videos", "All")
+    val categories = listOf("All", "Lectures", "Notes", "DPP", "DPP Videos")
     val visible = if (selected == "All") records else records.filter { it.category == selected }
     val selectedRecords = visible.filter { it.uri in selectedUris }
     val totalStored = records.sumOf { it.bytes }
@@ -532,7 +532,7 @@ fun DownloadCenterScreen(
         item {
             androidx.compose.foundation.layout.Row(Modifier.fillMaxWidth(), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
                 androidx.compose.foundation.layout.Column(Modifier.weight(1f)) {
-                    androidx.compose.material3.Text("Download Center", style = androidx.compose.material3.MaterialTheme.typography.titleLarge, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold)
+                    androidx.compose.material3.Text("Download queue", style = androidx.compose.material3.MaterialTheme.typography.titleLarge, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold)
                     androidx.compose.material3.Text("$runningCount active  ·  $queuedCount queued", style = androidx.compose.material3.MaterialTheme.typography.labelSmall, color = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant)
                 }
 
@@ -599,7 +599,16 @@ fun DownloadCenterScreen(
                     androidx.compose.foundation.layout.Column(Modifier.fillMaxWidth().padding(horizontal = 11.dp, vertical = 9.dp), verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(5.dp)) {
                         androidx.compose.foundation.layout.Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
                             androidx.compose.foundation.layout.Column(Modifier.weight(1f)) {
-                                androidx.compose.material3.Text(item.title, maxLines = 2, fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold, style = androidx.compose.material3.MaterialTheme.typography.bodyMedium)
+                                androidx.compose.material3.Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically, horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(8.dp)) {
+                                    if (item.active && !item.paused) {
+                                        androidx.compose.material3.CircularProgressIndicator(
+                                            modifier = Modifier.size(17.dp),
+                                            strokeWidth = 2.dp,
+                                            color = androidx.compose.material3.MaterialTheme.colorScheme.primary
+                                        )
+                                    }
+                                    androidx.compose.material3.Text(item.title, maxLines = 2, fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold, style = androidx.compose.material3.MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
+                                }
                                 androidx.compose.material3.Text(if (item.paused) "Paused · slot released" else if (item.active) "Downloading · ${item.category}" else "Queued · ${item.category}", style = androidx.compose.material3.MaterialTheme.typography.labelSmall, color = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant)
                                 if (item.active && item.total > 0L) {
                                     androidx.compose.material3.LinearProgressIndicator(progress = (item.bytes.toFloat() / item.total.toFloat()).coerceIn(0f, 1f), modifier = Modifier.fillMaxWidth())
