@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.height
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
@@ -358,41 +359,70 @@ internal fun UpdateSettingsScreen(
     var apk by remember { mutableStateOf<File?>(null) }
     var status by remember { mutableStateOf("Check for updates to see if a new version is available.") }
 
+    val verifying = keyStatus.contains("verifying", ignoreCase = true) ||
+        keyStatus.contains("checking", ignoreCase = true) ||
+        keyStatus.contains("activating", ignoreCase = true) ||
+        keyStatus.contains("loading batch", ignoreCase = true)
+    val verified = keyStatus == "Verified" || (hasApiKey && apiKey.isNotBlank() && keyStatus.isBlank())
+    val verificationFailed = keyStatus.contains("failed", ignoreCase = true) ||
+        keyStatus.contains("could not", ignoreCase = true) ||
+        keyStatus.contains("error", ignoreCase = true)
+
     Column(
         modifier = Modifier.fillMaxSize().padding(top = 8.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp)
+        verticalArrangement = Arrangement.spacedBy(9.dp)
     ) {
-        Text("Settings", style = MaterialTheme.typography.headlineSmall,
-            fontWeight = androidx.compose.ui.text.font.FontWeight.Bold)
-        Text("Batch API", style = MaterialTheme.typography.titleMedium,
-            fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold)
         Text(
-            if (hasApiKey) "Your API key is saved. You can replace it here."
-            else "Add an API key to load batches, subjects and lectures.",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+            "API-KEY",
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold
         )
         androidx.compose.material3.OutlinedTextField(
             value = apiKey,
             onValueChange = onApiKeyChange,
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.fillMaxWidth().height(54.dp),
             singleLine = true,
-            shape = RoundedCornerShape(13.dp),
-            textStyle = MaterialTheme.typography.bodyMedium,
-            placeholder = { Text("Paste API key") }
+            shape = RoundedCornerShape(11.dp),
+            textStyle = MaterialTheme.typography.bodySmall,
+            placeholder = { Text("Paste key here", style = MaterialTheme.typography.bodySmall) },
+            trailingIcon = {
+                when {
+                    verifying -> CircularProgressIndicator(
+                        modifier = Modifier.size(17.dp),
+                        strokeWidth = 2.dp,
+                        color = androidx.compose.ui.graphics.Color(0xFFAAA2FF)
+                    )
+                    verified -> Text(
+                        "✓",
+                        color = androidx.compose.ui.graphics.Color(0xFF38C879),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = androidx.compose.ui.text.font.FontWeight.Bold
+                    )
+                    verificationFailed -> Text(
+                        "!",
+                        color = androidx.compose.ui.graphics.Color(0xFFFF6B6B),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = androidx.compose.ui.text.font.FontWeight.Bold
+                    )
+                }
+            },
+            colors = androidx.compose.material3.OutlinedTextFieldDefaults.colors(
+                focusedTextColor = androidx.compose.ui.graphics.Color.White,
+                unfocusedTextColor = androidx.compose.ui.graphics.Color.White,
+                cursorColor = androidx.compose.ui.graphics.Color(0xFFB5A9FF),
+                focusedBorderColor = androidx.compose.ui.graphics.Color(0xFF9B8CFF),
+                unfocusedBorderColor = androidx.compose.ui.graphics.Color(0xFF343D50),
+                focusedContainerColor = androidx.compose.ui.graphics.Color(0xFF101521),
+                unfocusedContainerColor = androidx.compose.ui.graphics.Color(0xFF101521)
+            )
         )
         Button(
             onClick = onGenerateApiKey,
             enabled = !keyStatus.startsWith("Generating"),
-            modifier = Modifier.fillMaxWidth()
-        ) { Text("Generate") }
-        if (keyStatus.isNotBlank()) {
-            Text(
-                keyStatus,
-                style = MaterialTheme.typography.labelSmall,
-                color = if (keyStatus == "Verified") androidx.compose.ui.graphics.Color(0xFF71D6C5)
-                    else MaterialTheme.colorScheme.onSurfaceVariant
-            )
+            modifier = Modifier.fillMaxWidth().height(40.dp),
+            contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 12.dp, vertical = 5.dp)
+        ) {
+            Text("NO KEY? Generate", style = MaterialTheme.typography.labelLarge)
         }
 
         androidx.compose.foundation.layout.Spacer(Modifier.weight(1f))
