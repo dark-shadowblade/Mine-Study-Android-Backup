@@ -908,22 +908,6 @@ private fun MineStudyApp() {
         Toast.makeText(context, if (batch == id) "Removed from My batches. It remains your active batch." else "Batch removed from My batches", Toast.LENGTH_SHORT).show()
     }
 
-    fun addManualBatch() {
-        val id = manualBatchId.trim()
-        if (id.isBlank()) return
-        if (!id.matches(Regex("[A-Za-z0-9_-]{8,64}"))) {
-            batchSearchError = "Enter a valid batch ID (8–64 letters or numbers)."
-            return
-        }
-        val existing = savedBatchInfo[id] ?: BatchInfo(id, "Manual batch")
-        val isFirstBatch = batch.isBlank()
-        saveBatchInfo(existing)
-        if (isFirstBatch) openBatch(existing)
-        manualBatchId = ""
-        batchSearchError = ""
-        Toast.makeText(context, "Batch added to My batches", Toast.LENGTH_SHORT).show()
-    }
-
     fun openBatch(info: BatchInfo) {
         scope.launch {
             busy = true
@@ -946,6 +930,22 @@ private fun MineStudyApp() {
                 error = e.message ?: "Could not open this batch"
             } finally { busy = false }
         }
+    }
+
+    fun addManualBatch() {
+        val id = manualBatchId.trim()
+        if (id.isBlank()) return
+        if (!id.matches(Regex("[A-Za-z0-9_-]{8,64}"))) {
+            batchSearchError = "Enter a valid batch ID (8–64 letters or numbers)."
+            return
+        }
+        val existing = savedBatchInfo[id] ?: BatchInfo(id, "Manual batch")
+        val isFirstBatch = batch.isBlank()
+        saveBatchInfo(existing)
+        if (isFirstBatch) openBatch(existing)
+        manualBatchId = ""
+        batchSearchError = ""
+        Toast.makeText(context, "Batch added to My batches", Toast.LENGTH_SHORT).show()
     }
 
     fun batchEditDistance(a: String, b: String): Int {
