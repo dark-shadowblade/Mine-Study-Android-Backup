@@ -57,7 +57,6 @@ import androidx.compose.material.icons.filled.Fullscreen
 import androidx.compose.material.icons.filled.FullscreenExit
 import androidx.compose.material.icons.filled.Key
 import androidx.compose.material.icons.filled.MenuBook
-import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.Replay10
@@ -133,18 +132,9 @@ data class BatchInfo(val id: String, val name: String, val language: String = ""
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        // FCM startup subscription temporarily disabled while isolating reported launch crash.
         setContent {
-            var latestUpdateVersion by remember { mutableLongStateOf(0L) }
-            val openUpdateSettings = intent.getBooleanExtra("open_update_settings", false)
-            MineStudyApp(
-                openUpdateSettings = openUpdateSettings,
-                latestUpdateVersion = latestUpdateVersion
-            )
-            AutoUpdateChecker(onUpdateAvailable = { latestUpdateVersion = it })
-        }
-        if (Build.VERSION.SDK_INT >= 33 && checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
-            requestPermissions(arrayOf(android.Manifest.permission.POST_NOTIFICATIONS), 4107)
+            MineStudyApp()
+            AutoUpdateChecker()
         }
     }
 }
@@ -458,13 +448,10 @@ private class StudyApi(private val context: Context) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun MineStudyApp(openUpdateSettings: Boolean, latestUpdateVersion: Long) {
+private fun MineStudyApp() {
     val context = LocalContext.current
     val api = remember { StudyApi(context) }
     val scope = rememberCoroutineScope()
-    val notificationPrefs = remember { context.getSharedPreferences("mine_study_notifications", Context.MODE_PRIVATE) }
-    var lastViewedUpdateVersion by remember { mutableLongStateOf(notificationPrefs.getLong("last_viewed_update_version", 0L)) }
-    val hasUnreadNotification = latestUpdateVersion > lastViewedUpdateVersion
     val progressPrefs = remember { context.getSharedPreferences("mine_study_progress", Context.MODE_PRIVATE) }
     var lastSubjectId by remember { mutableStateOf(progressPrefs.getString("subject_id", "").orEmpty()) }
     var lastSubjectTitle by remember { mutableStateOf(progressPrefs.getString("subject_title", "").orEmpty()) }
@@ -585,10 +572,10 @@ private fun MineStudyApp(openUpdateSettings: Boolean, latestUpdateVersion: Long)
             busy = true
             try {
                 subjects = api.list(api.get("/batch/${api.batchId}/subject"), "subjects")
-                if (!openUpdateSettings) screen = "home"
+                screen = "home"
                 error = ""
             } catch (e: Exception) {
-                if (!openUpdateSettings) screen = "home"
+                screen = "home"
                 error = e.message ?: "Could not load your study library"
             } finally {
                 busy = false
@@ -1181,19 +1168,6 @@ private fun MineStudyApp(openUpdateSettings: Boolean, latestUpdateVersion: Long)
                             }
                         },
                         actions = {
-                            IconButton(onClick = {
-                                if (latestUpdateVersion > 0L) {
-                                    notificationPrefs.edit().putLong("last_viewed_update_version", latestUpdateVersion).apply()
-                                    lastViewedUpdateVersion = latestUpdateVersion
-                                }
-                                screen = "notifications"
-                            }) {
-                                BadgedBox(badge = {
-                                    if (hasUnreadNotification) Badge(containerColor = Color(0xFFE53935))
-                                }) {
-                                    Icon(Icons.Default.Notifications, contentDescription = "Notifications")
-                                }
-                            }
                             val downloadingNow = downloadState.queueItems.any { it.active && !it.paused }
                             val downloadIconTransition = androidx.compose.animation.core.rememberInfiniteTransition(label = "downloader-icon")
                             val downloadIconScale by downloadIconTransition.animateFloat(
@@ -1874,7 +1848,6 @@ private fun MineStudyApp(openUpdateSettings: Boolean, latestUpdateVersion: Long)
                             }
                         }
                     }
-                    "notifications" -> NotificationsScreen(onOpenSettings = { screen = "settings" })
                 }
                 if (busy) LinearProgressIndicator(Modifier.fillMaxWidth().padding(top = 8.dp))
                     }
