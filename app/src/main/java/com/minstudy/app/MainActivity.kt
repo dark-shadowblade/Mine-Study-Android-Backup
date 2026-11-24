@@ -172,7 +172,7 @@ private class StudyApi(private val context: Context) {
         }
 
     var batchId: String
-        get() = prefs.getString("batch_id", "") ?: ""
+        get() = prefs.getString("batch_id", BATCH_ONE) ?: BATCH_ONE
         set(value) { prefs.edit().putString("batch_id", value).apply() }
 
     // Mirrors Mine-Study/index.html request(): validate the envelope, then
@@ -230,69 +230,12 @@ private class StudyApi(private val context: Context) {
             append("/batch/search/v2?cohortId=635b83410a47c70011ca5ffb&exam=UPSC&page=$page")
             if (keyword.isNotBlank()) append("&keyword=${enc(keyword)}")
         }
-        val response = get(query, unwrapData = false)
-        val batchIdKeys = setOf("_id", "id", "batchId", "batch_id", "batchID", "batch_id")
-        var emptyBatchArray: JSONArray? = null
-        fun hasBatchIdentity(item: JSONObject): Boolean {
-            val keys = item.keys()
-            while (keys.hasNext()) {
-                val key = keys.next()
-                if (batchIdKeys.any { it.equals(key, ignoreCase = true) } &&
-                    item.optString(key).isNotBlank() && item.optString(key) != "null") return true
-            }
-            return false
-        }
-        fun findBatchArray(value: Any?, depth: Int = 0): JSONArray? {
-            if (depth > 8) return null
-            if (value is JSONObject) {
-                val preferred = listOf("batches", "batchList", "batch_list", "results", "items", "docs")
-                for (key in preferred) {
-                    val nested = value.opt(key)
-                    if (nested is JSONArray && (0 until nested.length()).any { nested.optJSONObject(it)?.let(::hasBatchIdentity) == true }) return nested
-                    findBatchArray(nested, depth + 1)?.let { return it }
-                }
-                val keys = value.keys()
-                while (keys.hasNext()) {
-                    val nested = value.opt(keys.next())
-                    findBatchArray(nested, depth + 1)?.let { return it }
-                }
-            } else if (value is JSONArray) {
-                if (value.length() == 0) {
-                    if (emptyBatchArray == null) emptyBatchArray = value
-                } else if ((0 until value.length()).any { value.optJSONObject(it)?.let(::hasBatchIdentity) == true }) {
-                    return value
-                } else {
-                    for (index in 0 until value.length()) findBatchArray(value.opt(index), depth + 1)?.let { return it }
-                }
-            }
-            return null
-        }
-        fun findTotalPages(value: Any?, depth: Int = 0): Int? {
-            if (depth > 8 || value !is JSONObject) return null
-            val pageKeys = setOf("totalPages", "total_pages", "totalPage", "total_page", "pages")
-            val keys = value.keys()
-            while (keys.hasNext()) {
-                val key = keys.next()
-                val nested = value.opt(key)
-                if (pageKeys.any { it.equals(key, ignoreCase = true) }) {
-                    val total = when (nested) {
-                        is Number -> nested.toInt()
-                        is String -> nested.toIntOrNull() ?: 0
-                        else -> 0
-                    }
-                    if (total > 0) return total
-                }
-                findTotalPages(nested, depth + 1)?.let { return it }
-            }
-            return null
-        }
-        val array = findBatchArray(response) ?: emptyBatchArray
-            ?: throw IllegalStateException("Batch server returned an unrecognized response")
+        val payload = get(query, unwrapData = true) as? JSONObject
+            ?: throw IllegalStateException("Unexpected batch search response")
+        val array = payload.optJSONArray("batches") ?: JSONArray()
         val batches = (0 until array.length()).mapNotNull { index ->
             val item = array.optJSONObject(index) ?: return@mapNotNull null
-            val id = listOf("_id", "id", "batchId", "batch_id").firstNotNullOfOrNull { key ->
-                item.optString(key).takeIf { it.isNotBlank() && it != "null" }
-            } ?: return@mapNotNull null
+            val id = item.optString("_id").takeIf { it.isNotBlank() } ?: return@mapNotNull null
             // Batch search v2 exposes the official card artwork as previewImage.
             val previewImage = item.optString("previewImage").trim()
                 .takeIf { it.startsWith("https://", true) || it.startsWith("http://", true) }
@@ -329,8 +272,7 @@ private class StudyApi(private val context: Context) {
             val thumbnail = previewImage ?: findImage(item).orEmpty()
             BatchInfo(id, item.optString("name", "Unnamed batch"), item.optString("lang", ""), item.optString("class", ""), thumbnail)
         }
-        // If the server omits pagination metadata, allow callers to scan pages until an empty page.
-        return batches to (findTotalPages(response)?.coerceAtLeast(1) ?: 50)
+        return batches to (payload.optJSONObject("pagination")?.optInt("totalPages", 1)?.coerceAtLeast(1) ?: 1)
     }
 
     suspend fun generateKeyLink(): String {
@@ -356,9 +298,7 @@ private class StudyApi(private val context: Context) {
 
     suspend fun verifyKey(candidate: String, onStatus: (String) -> Unit = {}): Int {
         if (candidate.isBlank()) throw IllegalStateException("Enter an API key first")
-        // Keep the legacy target only for API-key validation; it is never
-        // selected, saved, or shown as a user's batch.
-        val subjectPath = "/batch/${batchId.ifBlank { BATCH_ONE }}/subject"
+        val subjectPath = "/batch/$batchId/subject"
 
         // Check first: a key may already be activated even after app data is cleared.
         onStatus("Checking whether API key is already activated...")
@@ -403,94 +343,49 @@ private class StudyApi(private val context: Context) {
     }
 
     fun list(value: Any?, kind: String): List<StudyItem> {
-        // The API may return the list directly or wrap it in an object
-        // (for example { subjects: [...] } or { data: { subjects: [...] } }).
-        // Resolve either shape instead of rejecting valid subject responses.
-        val array = value as? JSONArray ?: findArray(value, kind)
-            ?: throw IllegalStateException("Unexpected API response: no $kind list was found")
+        // Mine-Study request() returns json.data ?? json; each caller expects
+        // that exact payload to be an array.
+        val array = value as? JSONArray
+            ?: throw IllegalStateException("Unexpected API response: expected an array for $kind")
 
-        val parsed = (0 until array.length()).mapNotNull { i ->
+        return (0 until array.length()).mapNotNull { i ->
             val obj = array.optJSONObject(i) ?: return@mapNotNull null
             val id = when (kind) {
-                "subjects" -> first(obj, "_id", "id", "subjectId", "subject_id")
-                "chapters" -> first(obj, "chapter_id", "_id", "id", "chapterId")
-                "contents" -> first(obj, "_id", "videoId", "video_id", "id")
+                "subjects" -> first(obj, "_id")
+                "chapters" -> first(obj, "chapter_id")
+                "contents" -> first(obj, "_id", "videoId", "id")
                 else -> null
             } ?: return@mapNotNull null
+
             val title = when (kind) {
-                "subjects" -> first(obj, "subject", "name", "title", "subjectName")
-                "chapters" -> first(obj, "name", "chapter", "title")
-                "contents" -> first(obj, "name", "topic", "title")
+                "subjects" -> first(obj, "subject")
+                "chapters" -> first(obj, "name")
+                "contents" -> first(obj, "name", "topic")
                 else -> null
             } ?: "Untitled"
-            val subtitle = if (kind == "contents") first(obj, "duration", "date", "topic") ?: "" else ""
+            val subtitle = if (kind == "contents") {
+                first(obj, "duration", "date", "topic") ?: ""
+            } else ""
             StudyItem(id, title, subtitle, obj)
         }
-        if (array.length() > 0 && parsed.isEmpty()) {
-            throw IllegalStateException("The API returned a $kind list, but its entries did not contain recognized IDs.")
-        }
-        return parsed
     }
 
-    // Only accept arrays containing records with IDs appropriate for the requested screen.
-    private fun findArray(value: Any?, kind: String, depth: Int = 0): JSONArray? {
-        if (depth > 10) return null
-        val idKeys = when (kind) {
-            "subjects" -> arrayOf("_id", "id", "subjectId", "subject_id")
-            "chapters" -> arrayOf("chapter_id", "_id", "id", "chapterId")
-            "contents" -> arrayOf("_id", "videoId", "video_id", "id")
-            else -> emptyArray()
-        }
-        var best: JSONArray? = null
-        var bestScore = 0
-        fun score(array: JSONArray): Int {
-            var count = 0
-            for (i in 0 until array.length()) {
-                val item = array.optJSONObject(i) ?: continue
-                if (first(item, *idKeys) != null) count++
+    private fun findArray(value: Any?): JSONArray? {
+        if (value is JSONArray) return value
+        if (value is JSONObject) {
+            for (key in listOf("data", "subjects", "chapters", "contents", "videos", "result", "items")) {
+                val v = value.opt(key)
+                if (v is JSONArray) return v
+                if (v is JSONObject) findArray(v)?.let { return it }
             }
-            return count
-        }
-        fun consider(candidate: JSONArray?) {
-            if (candidate == null) return
-            val candidateScore = score(candidate)
-            if (candidateScore > bestScore) {
-                best = candidate
-                bestScore = candidateScore
-            }
-        }
-        when (value) {
-            is JSONArray -> {
-                consider(value)
-                for (i in 0 until value.length()) consider(findArray(value.opt(i), kind, depth + 1))
-            }
-            is JSONObject -> {
-                val preferred = when (kind) {
-                    "subjects" -> listOf("subjects", "data", "result", "items")
-                    "chapters" -> listOf("chapters", "data", "result", "items")
-                    else -> listOf("contents", "videos", "data", "result", "items")
-                }
-                for (key in preferred) consider(findArray(value.opt(key), kind, depth + 1))
-                val keys = value.keys()
-                while (keys.hasNext()) consider(findArray(value.opt(keys.next()), kind, depth + 1))
-            }
-        }
-        return best
-    }
-
-    private fun first(obj: JSONObject, vararg keys: String): String? {
-        for (wanted in keys) {
-            val iterator = obj.keys()
-            while (iterator.hasNext()) {
-                val actual = iterator.next()
-                if (actual.equals(wanted, ignoreCase = true)) {
-                    val value = obj.optString(actual)
-                    if (value.isNotBlank() && value != "null") return value
-                }
-            }
+            val keys = value.keys()
+            while (keys.hasNext()) findArray(value.opt(keys.next()))?.let { return it }
         }
         return null
     }
+
+    private fun first(obj: JSONObject, vararg keys: String): String? =
+        keys.firstNotNullOfOrNull { key -> obj.optString(key).takeIf { it.isNotBlank() && it != "null" } }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
