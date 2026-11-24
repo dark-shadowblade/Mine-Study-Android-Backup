@@ -539,8 +539,6 @@ private fun MineStudyApp(openUpdateSettings: Boolean, latestUpdateVersion: Long)
     var keyLink by remember { mutableStateOf("") }
     var keyStatus by remember { mutableStateOf("") }
     var showSettings by remember { mutableStateOf(apiKey.isBlank()) }
-    // Keep the first-run API popup distinct from the Settings > Manage API key dialog.
-    var apiKeyDialogFromSettings by remember { mutableStateOf(false) }
     var downloadRecords by remember { mutableStateOf(DownloadRepository.list(context)) }
     var openedPdfUri by remember { mutableStateOf<Uri?>(null) }
     var openedPdfTitle by remember { mutableStateOf("") }
@@ -603,23 +601,26 @@ private fun MineStudyApp(openUpdateSettings: Boolean, latestUpdateVersion: Long)
 
     // A newly pasted key is checked automatically. Existing saved keys do not
     // close Settings just because the user opened the dialog.
-    LaunchedEffect(apiKey, batch, showSettings) {
-        if (showSettings && apiKey.isNotBlank() && apiKey.trim() != api.apiKey.trim()) {
+    LaunchedEffect(apiKey, batch, showSettings, screen) {
+        val settingsPage = screen == "api_key"
+        if ((showSettings || settingsPage) && apiKey.isNotBlank() && apiKey.trim() != api.apiKey.trim()) {
             keyStatus = "Verifying..."
             delay(500)
             api.batchId = batch
             try {
-                val count = api.verifyKey(apiKey) { status -> keyStatus = status }
+                api.verifyKey(apiKey) { status -> keyStatus = status }
                 api.apiKey = apiKey.trim()
                 keyStatus = "Verified"
                 error = ""
-                showSettings = false
-                if (batch.isNotBlank()) {
-                    loadSubjects()
-                } else {
-                    // Fresh installs start with no selected batch.
-                    screen = "home"
-                    error = ""
+                if (!settingsPage) {
+                    showSettings = false
+                    if (batch.isNotBlank()) {
+                        loadSubjects()
+                    } else {
+                        // Fresh installs start with no selected batch.
+                        screen = "home"
+                        error = ""
+                    }
                 }
             } catch (e: Exception) {
                 keyStatus = "Key verification failed. Tap Generate and paste a new key."
@@ -1139,6 +1140,7 @@ private fun MineStudyApp(openUpdateSettings: Boolean, latestUpdateVersion: Long)
             "pdf" -> "downloads"
             "download_center" -> "home"
             "notifications" -> "home"
+            "api_key" -> "settings"
             "contents" -> "chapters"
             "chapters" -> "home"
             else -> "home"
@@ -1220,7 +1222,7 @@ private fun MineStudyApp(openUpdateSettings: Boolean, latestUpdateVersion: Long)
                 }
             },
             bottomBar = {
-                if (screen in setOf("home", "all_batches", "my_batches", "downloads", "settings")) {
+                if (screen in setOf("home", "all_batches", "my_batches", "downloads", "settings", "api_key")) {
                     NavigationBar(
                         containerColor = Color(0xFF111622),
                         tonalElevation = 0.dp,
@@ -1259,7 +1261,7 @@ private fun MineStudyApp(openUpdateSettings: Boolean, latestUpdateVersion: Long)
                             label = { Text("Downloads", maxLines = 1, fontSize = 10.sp) }
                         )
                         NavigationBarItem(
-                            selected = screen == "settings",
+                            selected = screen == "settings" || screen == "api_key",
                             onClick = { screen = "settings" },
                             icon = { Icon(Icons.Default.Settings, contentDescription = null) },
                             label = { Text("Settings", maxLines = 1, fontSize = 10.sp) }
@@ -1808,10 +1810,70 @@ private fun MineStudyApp(openUpdateSettings: Boolean, latestUpdateVersion: Long)
                         onManageApiKey = {
                             apiKey = api.apiKey
                             keyStatus = ""
-                            apiKeyDialogFromSettings = true
-                            showSettings = true
+                            screen = "api_key"
                         }
                     )
+                    "api_key" -> {
+                        Column(
+                            Modifier.fillMaxWidth().padding(top = 14.dp),
+                            verticalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            Text("API key", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
+                            OutlinedTextField(
+                                value = apiKey,
+                                onValueChange = { value ->
+                                    apiKey = value
+                                    keyStatus = ""
+                                    api.batchId = batch
+                                },
+                                modifier = Modifier.fillMaxWidth(),
+                                singleLine = true,
+                                shape = RoundedCornerShape(13.dp),
+                                textStyle = MaterialTheme.typography.bodyMedium,
+                                colors = OutlinedTextFieldDefaults.colors(
+                                    focusedTextColor = Color.White,
+                                    unfocusedTextColor = Color.White,
+                                    cursorColor = Color(0xFFB5A9FF),
+                                    focusedBorderColor = Color(0xFF9B8CFF),
+                                    unfocusedBorderColor = Color(0xFF343D50),
+                                    focusedContainerColor = Color(0xFF101521),
+                                    unfocusedContainerColor = Color(0xFF101521)
+                                ),
+                                placeholder = { Text("Paste API key") }
+                            )
+                            Button(
+                                onClick = {
+                                    scope.launch {
+                                        keyStatus = "Generating key link..."
+                                        try {
+                                            keyLink = api.generateKeyLink()
+                                            val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                                            clipboard.setPrimaryClip(ClipData.newPlainText("Mine Study key link", keyLink))
+                                            keyStatus = "Link copied. Get your key and paste it above."
+                                            openExternal(context, keyLink)
+                                        } catch (e: Exception) {
+                                            keyStatus = "Could not generate key. Check your connection."
+                                        }
+                                    }
+                                },
+                                enabled = !keyStatus.startsWith("Generating"),
+                                modifier = Modifier.fillMaxWidth().height(46.dp),
+                                shape = RoundedCornerShape(13.dp),
+                                contentPadding = PaddingValues(vertical = 8.dp)
+                            ) {
+                                Icon(Icons.Default.Key, null, modifier = Modifier.size(17.dp))
+                                Spacer(Modifier.width(7.dp))
+                                Text("Generate")
+                            }
+                            if (keyStatus.isNotBlank()) {
+                                Text(
+                                    keyStatus,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = if (keyStatus == "Verified") Color(0xFF71D6C5) else Color(0xFF9AA5BA)
+                                )
+                            }
+                        }
+                    }
                     "notifications" -> NotificationsScreen(onOpenSettings = { screen = "settings" })
                 }
                 if (busy) LinearProgressIndicator(Modifier.fillMaxWidth().padding(top = 8.dp))
@@ -1884,19 +1946,7 @@ private fun MineStudyApp(openUpdateSettings: Boolean, latestUpdateVersion: Long)
             },
             confirmButton = {},
             dismissButton = {
-                if (apiKeyDialogFromSettings) {
-                    if (api.apiKey.isNotBlank()) {
-                        TextButton(onClick = {
-                            showSettings = false
-                            apiKeyDialogFromSettings = false
-                        }) {
-                            Text("Done")
-                        }
-                    }
-                } else {
-                    // Preserve the original first-run popup action; the compact
-                    // Settings-only layout must not change this popup.
-                    TextButton(onClick = {
+                TextButton(onClick = {
                         downloadRecords = DownloadRepository.list(context)
                         showSettings = false
                         screen = "downloads"
@@ -1904,7 +1954,6 @@ private fun MineStudyApp(openUpdateSettings: Boolean, latestUpdateVersion: Long)
                         Icon(Icons.Default.FolderOpen, null, modifier = Modifier.size(16.dp))
                         Spacer(Modifier.width(6.dp))
                         Text("Open Downloads")
-                    }
                 }
             }
         )
