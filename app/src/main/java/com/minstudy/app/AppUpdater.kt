@@ -339,8 +339,11 @@ private fun installDownloadedUpdate(context: Context, apk: File) {
 
 @Composable
 internal fun UpdateSettingsScreen(
+    apiKey: String,
+    keyStatus: String,
     hasApiKey: Boolean,
-    onManageApiKey: () -> Unit
+    onApiKeyChange: (String) -> Unit,
+    onGenerateApiKey: () -> Unit
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -357,31 +360,44 @@ internal fun UpdateSettingsScreen(
 
     Column(
         modifier = Modifier.fillMaxSize().padding(top = 8.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+        verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-        Text("Settings", style = MaterialTheme.typography.headlineSmall, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold)
-        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text("App version", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Text("v$installedVersion", style = MaterialTheme.typography.titleLarge, fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold)
-        }
-        Column(
+        Text("Settings", style = MaterialTheme.typography.headlineSmall,
+            fontWeight = androidx.compose.ui.text.font.FontWeight.Bold)
+        Text("Batch API", style = MaterialTheme.typography.titleMedium,
+            fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold)
+        Text(
+            if (hasApiKey) "Your API key is saved. You can replace it here."
+            else "Add an API key to load batches, subjects and lectures.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        androidx.compose.material3.OutlinedTextField(
+            value = apiKey,
+            onValueChange = onApiKeyChange,
+            modifier = Modifier.fillMaxWidth(),
+            singleLine = true,
+            shape = RoundedCornerShape(13.dp),
+            textStyle = MaterialTheme.typography.bodyMedium,
+            placeholder = { Text("Paste API key") }
+        )
+        Button(
+            onClick = onGenerateApiKey,
+            enabled = !keyStatus.startsWith("Generating"),
             modifier = Modifier.fillMaxWidth()
-                .padding(14.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            Text("Batch API", style = MaterialTheme.typography.titleMedium,
-                fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold)
+        ) { Text("Generate") }
+        if (keyStatus.isNotBlank()) {
             Text(
-                if (hasApiKey) "An API key is saved. Keys expire after 24 hours; replace it whenever needed."
-                else "Add an API key to load batches, subjects and lectures.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                keyStatus,
+                style = MaterialTheme.typography.labelSmall,
+                color = if (keyStatus == "Verified") androidx.compose.ui.graphics.Color(0xFF71D6C5)
+                    else MaterialTheme.colorScheme.onSurfaceVariant
             )
-            Button(onClick = onManageApiKey, modifier = Modifier.fillMaxWidth()) {
-                Text(if (hasApiKey) "Manage API key" else "Add API key")
-            }
         }
-        Text(status, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+
+        androidx.compose.foundation.layout.Spacer(Modifier.weight(1f))
+        Text(status, style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant)
         if (checking || downloading) {
             LinearProgressIndicator(
                 progress = { if (downloading) progress else 0f },
@@ -431,9 +447,7 @@ internal fun UpdateSettingsScreen(
                     }
                 },
                 modifier = Modifier.fillMaxWidth()
-            ) {
-                Text(if (apk?.exists() == true) "Download again" else "Download update")
-            }
+            ) { Text(if (apk?.exists() == true) "Download again" else "Download update") }
         }
         if (apk?.isFile == true) {
             Button(
@@ -441,5 +455,10 @@ internal fun UpdateSettingsScreen(
                 modifier = Modifier.fillMaxWidth()
             ) { Text("Install update") }
         }
+        Text(
+            "App version  ·  v$installedVersion",
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
     }
 }
