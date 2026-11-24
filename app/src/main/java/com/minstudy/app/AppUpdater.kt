@@ -53,7 +53,7 @@ private data class AppRelease(
 )
 
 @Composable
-internal fun AutoUpdateChecker(onUpdateAvailable: (Boolean) -> Unit = {}) {
+internal fun AutoUpdateChecker(onUpdateAvailable: (Long) -> Unit = {}) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val preferences = remember {
@@ -68,7 +68,7 @@ internal fun AutoUpdateChecker(onUpdateAvailable: (Boolean) -> Unit = {}) {
         val latest = withContext(Dispatchers.IO) { findAppUpdate(context) }
         if (latest != null) {
             release = latest
-            onUpdateAvailable(true)
+            onUpdateAvailable(latest.versionCode)
             if (preferences.getLong("notified_version", -1L) != latest.versionCode) {
                 showUpdateNotification(context, latest)
                 preferences.edit().putLong("notified_version", latest.versionCode).apply()
