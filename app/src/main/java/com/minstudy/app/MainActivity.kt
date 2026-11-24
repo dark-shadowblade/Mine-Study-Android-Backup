@@ -496,7 +496,7 @@ private fun MineStudyApp(latestUpdateVersion: Long) {
                 } else if (parts.size >= 2) BatchInfo(parts[0], parts[1], parts.getOrNull(2).orEmpty(), parts.getOrNull(3).orEmpty()) else null
             }?.associateBy { it.id } ?: emptyMap())
     }
-    var screen by remember { mutableStateOf(if (openUpdateSettings) "settings" else "home") }
+    var screen by remember { mutableStateOf("home") }
     var type by remember { mutableStateOf("videos") }
     var subjects by remember { mutableStateOf(emptyList<StudyItem>()) }
     var starredSubjectIds by remember(batch) {        mutableStateOf(progressPrefs.getStringSet("starred_subjects_$batch", emptySet())?.toSet() ?: emptySet())
