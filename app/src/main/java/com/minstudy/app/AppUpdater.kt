@@ -2,6 +2,9 @@ package com.minstudy.app
 
 import android.content.Context
 import android.content.Intent
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.app.PendingIntent
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
@@ -34,6 +37,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.core.content.FileProvider
+import androidx.core.app.NotificationCompat
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -62,40 +66,47 @@ internal fun AutoUpdateChecker() {
 
     LaunchedEffect(Unit) {
         val latest = withContext(Dispatchers.IO) { findAppUpdate(context) }
-        if (latest != null &&
-            preferences.getLong("dismissed_version", -1L) != latest.versionCode
-        ) {
+        if (latest != null) {
             release = latest
+            if (preferences.getLong("notified_version", -1L) != latest.versionCode) {
+                showUpdateNotification(context, latest)
+                preferences.edit().putLong("notified_version", latest.versionCode).apply()
+            }
         }
     }
 
     val available = release ?: return
 
-    fun dismissUpdate() {
-        preferences.edit().putLong("dismissed_version", available.versionCode).apply()
-        release = null
-    }
+    fun dismissUpdate() { release = null }
 
     AlertDialog(
         onDismissRequest = { if (!downloading) dismissUpdate() },
-        shape = RoundedCornerShape(24.dp),
-        containerColor = MaterialTheme.colorScheme.surface,
-        tonalElevation = 8.dp,
+        shape = RoundedCornerShape(22.dp),
+        containerColor = androidx.compose.ui.graphics.Color(0xFF171A22),
+        tonalElevation = 0.dp,
         title = {
-            Text(
-                "v${available.versionName}",
-                style = MaterialTheme.typography.headlineSmall,
-                fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold
-            )
+            Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                Text("UPDATE AVAILABLE", style = MaterialTheme.typography.labelSmall,
+                    color = androidx.compose.ui.graphics.Color(0xFFAAA2FF),
+                    fontWeight = androidx.compose.ui.text.font.FontWeight.Bold)
+                Text("Mine Study · v${available.versionName}",
+                    style = MaterialTheme.typography.titleLarge,
+                    color = androidx.compose.ui.graphics.Color(0xFFF2F2F7),
+                    fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold)
+            }
         },
         text = {
-            if (downloading) {
+            if (!downloading) {
+                Text("A newer version is ready to install.",
+                    color = androidx.compose.ui.graphics.Color(0xFFADB3C2),
+                    style = MaterialTheme.typography.bodyMedium)
+            } else {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     LinearProgressIndicator(
                         progress = { progress },
                         modifier = Modifier.fillMaxWidth(),
-                        color = MaterialTheme.colorScheme.primary,
-                        trackColor = MaterialTheme.colorScheme.surfaceVariant
+                        color = androidx.compose.ui.graphics.Color(0xFFAAA2FF),
+                        trackColor = androidx.compose.ui.graphics.Color(0xFF343947)
                     )
                     Text(
                         "${(progress * 100).toInt()}%",
@@ -155,10 +166,35 @@ internal fun AutoUpdateChecker() {
                 enabled = !downloading,
                 onClick = { dismissUpdate() }
             ) {
-                Text("Later")
+                Text("Not now", color = androidx.compose.ui.graphics.Color(0xFFADB3C2))
             }
         }
     )
+}
+
+private fun showUpdateNotification(context: Context, release: AppRelease) {
+    val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+    val channelId = "app_updates"
+    if (Build.VERSION.SDK_INT >= 26) {
+        manager.createNotificationChannel(NotificationChannel(
+            channelId, "App updates", NotificationManager.IMPORTANCE_DEFAULT
+        ).apply { description = "Notifications when a Mine Study update is available" })
+    }
+    val launchIntent = context.packageManager.getLaunchIntentForPackage(context.packageName)
+    val pendingIntent = launchIntent?.let {
+        PendingIntent.getActivity(context, 7301,
+            it.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP),
+            PendingIntent.FLAG_UPDATE_CURRENT or (if (Build.VERSION.SDK_INT >= 23) PendingIntent.FLAG_IMMUTABLE else 0))
+    }
+    val notification = NotificationCompat.Builder(context, channelId)
+        .setSmallIcon(context.applicationInfo.icon)
+        .setContentTitle("Mine Study update available")
+        .setContentText("Version v${release.versionName} is ready. Open the app to update.")
+        .setAutoCancel(true)
+        .setContentIntent(pendingIntent)
+        .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+        .build()
+    manager.notify(7301, notification)
 }
 
 private fun findAppUpdate(context: Context): AppRelease? {
