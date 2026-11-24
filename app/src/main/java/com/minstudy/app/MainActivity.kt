@@ -134,13 +134,13 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
-            var updateAvailable by remember { mutableStateOf(false) }
+            var latestUpdateVersion by remember { mutableLongStateOf(0L) }
             val openUpdateSettings = intent.getBooleanExtra("open_update_settings", false)
             MineStudyApp(
                 openUpdateSettings = openUpdateSettings,
-                updateAvailable = updateAvailable
+                latestUpdateVersion = latestUpdateVersion
             )
-            AutoUpdateChecker(onUpdateAvailable = { updateAvailable = it })
+            AutoUpdateChecker(onUpdateAvailable = { latestUpdateVersion = it })
         }
         if (Build.VERSION.SDK_INT >= 33 && checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
             requestPermissions(arrayOf(android.Manifest.permission.POST_NOTIFICATIONS), 4107)
@@ -457,10 +457,13 @@ private class StudyApi(private val context: Context) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun MineStudyApp(openUpdateSettings: Boolean, updateAvailable: Boolean) {
+private fun MineStudyApp(openUpdateSettings: Boolean, latestUpdateVersion: Long) {
     val context = LocalContext.current
     val api = remember { StudyApi(context) }
     val scope = rememberCoroutineScope()
+    val notificationPrefs = remember { context.getSharedPreferences("mine_study_notifications", Context.MODE_PRIVATE) }
+    var lastViewedUpdateVersion by remember { mutableLongStateOf(notificationPrefs.getLong("last_viewed_update_version", 0L)) }
+    val hasUnreadNotification = latestUpdateVersion > lastViewedUpdateVersion
     val progressPrefs = remember { context.getSharedPreferences("mine_study_progress", Context.MODE_PRIVATE) }
     var lastSubjectId by remember { mutableStateOf(progressPrefs.getString("subject_id", "").orEmpty()) }
     var lastSubjectTitle by remember { mutableStateOf(progressPrefs.getString("subject_title", "").orEmpty()) }
@@ -1173,13 +1176,40 @@ private fun MineStudyApp(openUpdateSettings: Boolean, updateAvailable: Boolean) 
                             }
                         },
                         actions = {
-                            IconButton(onClick = { screen = "notifications" }) {
-                                BadgedBox(badge = { if (updateAvailable) Badge() }) {
+                            IconButton(onClick = {
+                                if (latestUpdateVersion > 0L) {
+                                    notificationPrefs.edit().putLong("last_viewed_update_version", latestUpdateVersion).apply()
+                                    lastViewedUpdateVersion = latestUpdateVersion
+                                }
+                                screen = "notifications"
+                            }) {
+                                BadgedBox(badge = {
+                                    if (hasUnreadNotification) Badge(containerColor = Color(0xFFE53935))
+                                }) {
                                     Icon(Icons.Default.Notifications, contentDescription = "Notifications")
                                 }
                             }
+                            val downloadingNow = downloadState.queueItems.any { it.active && !it.paused }
+                            val downloadIconTransition = androidx.compose.animation.core.rememberInfiniteTransition(label = "downloader-icon")
+                            val downloadIconScale by downloadIconTransition.animateFloat(
+                                initialValue = 1f,
+                                targetValue = 1.18f,
+                                animationSpec = if (downloadingNow) androidx.compose.animation.core.infiniteRepeatable(
+                                    animation = tween(650),
+                                    repeatMode = androidx.compose.animation.core.RepeatMode.Reverse
+                                ) else androidx.compose.animation.core.snap(),
+                                label = "downloader-pulse"
+                            )
                             IconButton(onClick = { screen = "download_center" }) {
-                                Icon(Icons.Default.Download, contentDescription = "Downloader")
+                                Icon(
+                                    Icons.Default.Download,
+                                    contentDescription = "Downloader",
+                                    modifier = Modifier.graphicsLayer {
+                                        scaleX = if (downloadingNow) downloadIconScale else 1f
+                                        scaleY = if (downloadingNow) downloadIconScale else 1f
+                                    },
+                                    tint = if (downloadingNow) Color(0xFFB5A9FF) else LocalContentColor.current
+                                )
                             }
                         },
                         colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFF0B0D14))
